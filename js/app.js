@@ -228,6 +228,12 @@ const App = {
    */
   async handleLogin(event) {
     event.preventDefault();
+    // Verificação defensiva: se a lib Supabase não estiver disponível, aborta e avisa.
+    if (typeof window.supabase !== 'object') {
+      App.showToast('Não foi possível carregar o Supabase. Recarregue a página.');
+      return;
+    }
+
     const current = await DB.getSession();
     if (current.session?.user) {
       App.showToast('Você já está autenticado. Redirecionando para o app.');
@@ -341,10 +347,9 @@ const App = {
 
 // Inicialização simples: registra listeners e conecta Supabase.
 document.addEventListener('DOMContentLoaded', async () => {
-  // Garante que a lib do Supabase está carregada; se não estiver, avisa e aborta binds dependentes.
+  // Garante que a lib do Supabase está carregada; se não estiver, avisamos, mas seguimos com binds para não quebrar o restante da página.
   if (typeof window.supabase !== 'object') {
     App.showToast('Não foi possível carregar o Supabase. Recarregue a página.');
-    return;
   }
 
   // Reaplica a aba salva no estado (apenas efeito visual).
