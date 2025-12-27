@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Projeto · My Sweet Home</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+</head>
+<body class="page">
+  <header class="site-header">
+    <div class="container header-grid">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <span class="brand-name">My Sweet Home</span>
+      </div>
+      <nav class="nav">
+        <a class="nav-link" href="index.html">Home</a>
+        <a class="nav-link active" href="project.html">Projeto</a>
+        <a class="nav-link" href="planner.html">Planta</a>
+      </nav>
+      <div class="session-actions" id="session-actions">
+        <button class="btn ghost" type="button" onclick="App.navigate('index.html')">Entrar</button>
+        <button class="btn primary" type="button" onclick="App.navigate('index.html')">Criar conta</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Projeto macro · Apartamento</p>
+          <h1>Meu AP 2026</h1>
+          <p class="muted">Estruturamos esta página em três abas obrigatórias: Estrutura, Kanban e Dashboard. Cada bloco é leve, com muito respiro e bordas suaves.</p>
+        </div>
+        <div class="pill-row">
+          <span class="pill">Progresso 72%</span>
+          <span class="pill">Pontos 480</span>
+          <span class="pill danger">2 atrasos</span>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="structure" onclick="App.switchTab(event)">Estrutura</button>
+        <button class="tab" data-tab="kanban" onclick="App.switchTab(event)">Kanban</button>
+        <button class="tab" data-tab="dashboard" onclick="App.switchTab(event)">Dashboard</button>
+      </div>
+
+      <section id="tab-structure" class="tab-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Hierarquia</p>
+              <h3>Casa → Cômodos → Subpartes → Cantos</h3>
+              <p class="muted">Placeholder para uma futura árvore navegável. Mantemos uma lista mock para ilustrar o layout.</p>
+            </div>
+            <button class="btn secondary" type="button">Adicionar cômodo</button>
+          </div>
+          <ul class="structure-list">
+            <li>
+              <div>
+                <p class="label">Sala</p>
+                <p class="muted">Sofá, iluminação e marcenaria.</p>
+              </div>
+              <span class="badge">3 tarefas</span>
+            </li>
+            <li>
+              <div>
+                <p class="label">Cozinha</p>
+                <p class="muted">Planejados e eletrodomésticos.</p>
+              </div>
+              <span class="badge">4 tarefas</span>
+            </li>
+            <li>
+              <div>
+                <p class="label">Suíte</p>
+                <p class="muted">Cabeceira, iluminação e enxoval.</p>
+              </div>
+              <span class="badge">2 tarefas</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="tab-kanban" class="tab-panel hidden">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Fluxo</p>
+              <h3>Backlog · Fazendo · Feito</h3>
+              <p class="muted">Kanban enxuto apenas para referência visual. Colunas responsivas viram pilhas no mobile.</p>
+            </div>
+            <div class="filters">
+              <label class="muted">Filtrar por cômodo</label>
+              <select class="input">
+                <option>Sala</option>
+                <option>Cozinha</option>
+                <option>Suíte</option>
+              </select>
+            </div>
+          </div>
+          <div class="kanban">
+            <div class="kanban-column">
+              <div class="kanban-header">Backlog</div>
+              <article class="card kanban-card">
+                <p class="label">Comprar tapete</p>
+                <p class="muted">Sala · peso leve · custo R$ 800</p>
+                <div class="pill-row">
+                  <span class="pill">Prazo 12/09</span>
+                  <span class="pill outline">Foto antes pendente</span>
+                </div>
+              </article>
+            </div>
+            <div class="kanban-column">
+              <div class="kanban-header">Fazendo</div>
+              <article class="card kanban-card">
+                <p class="label">Instalar iluminação</p>
+                <p class="muted">Cozinha · peso médio · custo R$ 2.100</p>
+                <div class="pill-row">
+                  <span class="pill">Prazo 05/08</span>
+                  <span class="pill danger">Atraso</span>
+                </div>
+              </article>
+            </div>
+            <div class="kanban-column">
+              <div class="kanban-header">Feito</div>
+              <article class="card kanban-card">
+                <p class="label">Marcenaria home office</p>
+                <p class="muted">Suíte · peso pesado · custo R$ 5.500</p>
+                <div class="pill-row">
+                  <span class="pill">Prazo 20/07</span>
+                  <span class="pill">Fotos ok</span>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-dashboard" class="tab-panel hidden">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Indicadores</p>
+              <h3>Saúde do projeto</h3>
+              <p class="muted">Dashboard minimalista com cartões de métricas para inspirar a futura implementação real.</p>
+            </div>
+            <button class="btn ghost" type="button">Exportar</button>
+          </div>
+          <div class="grid metrics">
+            <article class="card metric-card">
+              <p class="label">Progresso</p>
+              <h2>72%</h2>
+              <p class="muted">Calculado a partir do peso das tarefas concluídas.</p>
+            </article>
+            <article class="card metric-card">
+              <p class="label">Pontos</p>
+              <h2>480</h2>
+              <p class="muted">Pontuação gamificada considerando fotos antes/depois.</p>
+            </article>
+            <article class="card metric-card">
+              <p class="label">Orçado × Real</p>
+              <h2>R$ 28k / R$ 30k</h2>
+              <p class="muted">Ilustra a comparação de custos planejados e reais.</p>
+            </article>
+            <article class="card metric-card">
+              <p class="label">Pendências de fotos</p>
+              <h2 class="danger">3</h2>
+              <p class="muted">Bloqueiam a conclusão de tarefas pesadas.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Editar tarefa</h3>
+        <button class="btn ghost" type="button" onclick="App.hideModal()">Fechar</button>
+      </div>
+      <label class="muted">Título</label>
+      <input class="input" type="text" placeholder="Ex.: Instalar iluminação" />
+      <div class="modal-actions">
+        <button class="btn primary" type="button">Salvar</button>
+        <button class="btn secondary" type="button" onclick="App.hideModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/project.js"></script>
+</body>
+</html>
