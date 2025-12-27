@@ -236,7 +236,7 @@ const App = {
     }
 
     const mode = document.getElementById('auth-submit')?.dataset?.mode || 'login';
-    const email = (document.getElementById('email')?.value || '').trim();
+    const email = (document.getElementById('loginEmail')?.value || '').trim();
     if (!email) {
       App.showToast('Informe um e-mail válido.');
       return;
@@ -260,7 +260,7 @@ const App = {
         return;
       }
 
-      const password = (document.getElementById('password')?.value || '').trim();
+      const password = (document.getElementById('loginPassword')?.value || '').trim();
       if (!password) {
         App.showToast('Senha é obrigatória.');
         return;
@@ -341,6 +341,12 @@ const App = {
 
 // Inicialização simples: registra listeners e conecta Supabase.
 document.addEventListener('DOMContentLoaded', async () => {
+  // Garante que a lib do Supabase está carregada; se não estiver, avisa e aborta binds dependentes.
+  if (typeof window.supabase !== 'object') {
+    App.showToast('Não foi possível carregar o Supabase. Recarregue a página.');
+    return;
+  }
+
   // Reaplica a aba salva no estado (apenas efeito visual).
   const savedTab = App.state.currentTab;
   const defaultTabButton = document.querySelector(`.tab[data-tab="${savedTab}"]`);
@@ -355,10 +361,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Hook do formulário de login (index).
-  const loginForm = document.getElementById('login-form');
+  const loginForm = document.getElementById('loginForm');
   if (loginForm) {
     loginForm.addEventListener('submit', (event) => App.handleLogin(event));
   }
+  const submitBtn = document.getElementById('auth-submit');
+  if (submitBtn && !submitBtn.dataset.mode) submitBtn.dataset.mode = 'login';
 
   const isAuthPage = location.pathname.endsWith('index.html') || location.pathname.endsWith('/');
 

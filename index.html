@@ -52,18 +52,18 @@
           <button class="tab" data-mode="reset" onclick="App.switchAuthTab(event)">Esqueci minha senha</button>
         </div>
 
-        <form id="login-form" class="auth-form">
-          <label class="muted" for="email">E-mail</label>
-          <input class="input" type="email" id="email" name="email" placeholder="voce@exemplo.com" required />
+        <form id="loginForm" class="auth-form">
+          <label class="muted" for="loginEmail">E-mail</label>
+          <input class="input" type="email" id="loginEmail" name="email" placeholder="voce@exemplo.com" required />
 
           <div id="password-group">
-            <label class="muted" for="password">Senha</label>
-            <input class="input" type="password" id="password" name="password" placeholder="Mínimo 8 caracteres" required />
+            <label class="muted" for="loginPassword">Senha</label>
+            <input class="input" type="password" id="loginPassword" name="password" placeholder="Mínimo 8 caracteres" required />
           </div>
 
           <div id="confirm-group" class="hidden">
             <label class="muted" for="confirm">Confirmar senha</label>
-          <input class="input" type="password" id="confirm" name="confirm" placeholder="Repita a senha" />
+            <input class="input" type="password" id="confirm" name="confirm" placeholder="Repita a senha" />
           </div>
 
           <p class="muted small" id="auth-helper">Digite suas credenciais para continuar.</p>
