@@ -93,6 +93,25 @@ const DB = (() => {
   }
 
   /**
+   * deleteProject
+   * - Exclui um projeto pertencente ao usuário logado.
+   * - Mesmo com RLS ativo, filtramos por user_id para reforçar a intenção (defesa em profundidade).
+   */
+  async function deleteProject(projectId) {
+    const supabase = initSupabase();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) return { data: null, error: new Error('Usuário não autenticado') };
+
+    console.info('deleteProject', projectId, 'user', userId);
+    return supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId)
+      .eq('user_id', userId);
+  }
+
+  /**
    * Escuta mudanças de autenticação.
    * - Ideal para reagir a magic link ou logout em múltiplas abas.
    */
@@ -135,6 +154,7 @@ const DB = (() => {
     upsertProfile,
     createProject,
     listProjects,
-    getProjectById
+    getProjectById,
+    deleteProject
   };
 })();

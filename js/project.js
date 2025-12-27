@@ -82,6 +82,7 @@ const ProjectUI = {
           </div>
           <div class="card-actions">
             <a class="btn secondary" href="project.html?id=${proj.id}">Abrir</a>
+            <button class="btn ghost danger" type="button" data-action="delete-project" data-project-id="${proj.id}">Excluir</button>
           </div>
         </article>`;
     }).join('');

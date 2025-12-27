@@ -7,7 +7,8 @@ const App = {
     user: null,
     currentTab: 'structure',
     toastTimer: null,
-    isSendingOtp: false // evita múltiplos envios e respeita o rate limit do Supabase (>=3s)
+    isSendingOtp: false, // evita múltiplos envios e respeita o rate limit do Supabase (>=3s)
+    projects: []
   },
 
   // Navegação básica entre páginas HTML estáticas.
@@ -359,7 +360,31 @@ const App = {
       grid.innerHTML = '<p class="muted">Não foi possível carregar projetos.</p>';
       return;
     }
-    ProjectUI.renderProjects(data || [], grid);
+    App.state.projects = data || [];
+    ProjectUI.renderProjects(App.state.projects, grid);
+  },
+
+  /**
+   * Exclui um projeto com confirmação e re-render da lista.
+   */
+  async handleDeleteProject(projectId, trigger) {
+    if (!projectId) return;
+    const grid = document.getElementById('projects-grid');
+    const confirmed = window.confirm('Excluir projeto?\n\nEssa ação não pode ser desfeita. O projeto será removido permanentemente.');
+    if (!confirmed) return;
+
+    if (trigger) trigger.disabled = true;
+    const { error } = await DB.deleteProject(projectId);
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível excluir. Tente novamente.');
+      if (trigger) trigger.disabled = false;
+      return;
+    }
+
+    App.showToast('Projeto excluído.');
+    App.state.projects = App.state.projects.filter((p) => String(p.id) !== String(projectId));
+    ProjectUI.renderProjects(App.state.projects, grid);
   }
 };
 
@@ -465,9 +490,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Delegação de eventos para logout: funciona mesmo se o header for re-renderizado.
   document.addEventListener('click', async (event) => {
-    const target = event.target.closest('[data-action="logout"]');
-    if (!target) return;
-    event.preventDefault();
-    await App.performLogout();
+    const logoutBtn = event.target.closest('[data-action="logout"]');
+    if (logoutBtn) {
+      event.preventDefault();
+      await App.performLogout();
+      return;
+    }
+
+    // Delegação para excluir projetos na lista (apenas no app).
+    const deleteBtn = event.target.closest('[data-action="delete-project"]');
+    if (deleteBtn) {
+      event.preventDefault();
+      const projectId = deleteBtn.dataset.projectId;
+      await App.handleDeleteProject(projectId, deleteBtn);
+    }
   });
 });
