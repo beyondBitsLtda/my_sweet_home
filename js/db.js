@@ -29,7 +29,15 @@ const DB = (() => {
 
   async function authSignUp(email, password) {
     const supabase = initSupabase();
-    return supabase.auth.signUp({ email, password });
+    const baseUrl = new URL('./', window.location.href);
+    const redirectTo = new URL('index.html', baseUrl).toString();
+    return supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectTo
+      }
+    });
   }
 
   async function authResetPassword(email) {

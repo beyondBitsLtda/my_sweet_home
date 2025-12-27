@@ -236,6 +236,10 @@ a {
   display: none;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .auth-form {
   display: grid;
   gap: var(--space-3);

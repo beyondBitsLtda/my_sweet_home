@@ -191,12 +191,14 @@ const App = {
     const submit = document.getElementById('auth-submit');
     const passwordGroup = document.getElementById('password-group');
     const confirmGroup = document.getElementById('confirm-group');
+    const signupNote = document.getElementById('signup-note');
 
     if (mode === 'signup') {
       helper.textContent = 'Use email e senha fortes. Se o email já existir, mostraremos a mensagem para fazer login.';
       submit.textContent = 'Criar conta';
       passwordGroup.classList.remove('hidden');
       confirmGroup.classList.remove('hidden');
+      signupNote?.classList.remove('hidden');
       submit.classList.remove('secondary');
       submit.classList.add('primary');
     } else if (mode === 'reset') {
@@ -204,6 +206,7 @@ const App = {
       submit.textContent = 'Enviar link de redefinição';
       passwordGroup.classList.add('hidden');
       confirmGroup.classList.add('hidden');
+      signupNote?.classList.add('hidden');
       submit.classList.remove('primary');
       submit.classList.add('secondary');
     } else {
@@ -211,6 +214,7 @@ const App = {
       submit.textContent = 'Entrar';
       passwordGroup.classList.remove('hidden');
       confirmGroup.classList.add('hidden');
+      signupNote?.classList.add('hidden');
       submit.classList.remove('secondary');
       submit.classList.add('primary');
     }
@@ -283,6 +287,15 @@ const App = {
           console.error(error);
           return;
         }
+
+        // Se a política exigir confirmação de email, session vem nula. Orientamos o usuário.
+        if (!data.session) {
+          App.showToast('Conta criada! Confirme seu email para ativar o acesso. Abra sua caixa de entrada e clique no link de confirmação.');
+          document.querySelector('.tab[data-mode="login"]')?.click();
+          event.target.reset();
+          return;
+        }
+
         await DB.upsertProfile(data.user);
         App.showToast('Conta criada com sucesso. Redirecionando...');
         App.navigate('app.html');
@@ -292,7 +305,12 @@ const App = {
       // Login
       const { data, error } = await DB.authSignInWithPassword(email, password);
       if (error) {
-        App.showToast('Email ou senha inválidos.');
+        const msg = error.message?.toLowerCase() || '';
+        if (msg.includes('email not confirmed') || msg.includes('email_not_confirmed')) {
+          App.showToast('Confirme seu email antes de entrar.');
+        } else {
+          App.showToast('Email ou senha inválidos.');
+        }
         console.error(error);
         return;
       }
