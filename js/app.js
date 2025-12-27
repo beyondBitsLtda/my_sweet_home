@@ -6,7 +6,8 @@ const App = {
   state: {
     user: null,
     currentTab: 'structure',
-    toastTimer: null
+    toastTimer: null,
+    isSendingOtp: false // evita múltiplos envios e respeita o rate limit do Supabase (>=3s)
   },
 
   // Navegação básica entre páginas HTML estáticas.
@@ -30,14 +31,26 @@ const App = {
   },
 
   /**
-   * redirectIfLoggedIn
-   * - Usado na página de login (index.html) para mandar usuários autenticados direto para o app.
+   * renderAuthUI
+   * - Controla o que aparece na tela de autenticação:
+   *   - Se houver sessão: esconde o formulário e mostra o card “logado como”.
+   *   - Se não houver sessão: mostra o formulário e oculta o card logado.
+   * - Evita enviar Magic Link “por cima” de uma sessão ativa.
    */
-  async redirectIfLoggedIn() {
-    const { session } = await DB.getSession();
+  renderAuthUI(session) {
+    const loginCard = document.getElementById('login-card');
+    const loggedCard = document.getElementById('logged-card');
+    const loggedEmail = document.getElementById('logged-email');
+
+    if (!loginCard || !loggedCard) return;
+
     if (session?.user) {
-      App.state.user = session.user;
-      App.navigate('app.html');
+      loginCard.classList.add('hidden');
+      loggedCard.classList.remove('hidden');
+      if (loggedEmail) loggedEmail.textContent = session.user.email;
+    } else {
+      loginCard.classList.remove('hidden');
+      loggedCard.classList.add('hidden');
     }
   },
 
@@ -136,6 +149,33 @@ const App = {
   },
 
   /**
+   * switchAccount
+   * - Permite trocar de conta de forma explícita: faz logout antes de exibir o formulário novamente.
+   * - Evita enviar Magic Link por cima de uma sessão ativa.
+   */
+  async switchAccount() {
+    await DB.authSignOut();
+    App.state.user = null;
+    App.renderAuthUI(null);
+    App.updateHeader(null);
+    App.showToast('Sessão encerrada. Insira o novo email para entrar.');
+  },
+
+  /**
+   * handleLogout
+   * - Logout básico reutilizável (botões “Sair”).
+   */
+  async handleLogout(event) {
+    event?.preventDefault();
+    await DB.authSignOut();
+    App.state.user = null;
+    App.updateHeader(null);
+    App.renderAuthUI(null);
+    App.showToast('Você saiu com segurança.');
+    App.navigate('index.html');
+  },
+
+  /**
    * switchAuthTab
    * - Alterna o texto de apoio do formulário entre “Entrar” e “Criar conta”.
    * - O fluxo técnico é o mesmo (magic link), mas a cópia comunica a intenção do usuário.
@@ -163,11 +203,11 @@ const App = {
    */
   async handleLogin(event) {
     event.preventDefault();
-    // Bloqueio: se já houver sessão ativa, não reenviamos link (evita spam e mantém UX honesta).
+    // Se já houver sessão ativa, mostramos o card logado e evitamos reenviar Magic Link.
     const current = await DB.getSession();
     if (current.session?.user) {
-      App.showToast('Você já está autenticado. Redirecionando para o aplicativo.');
-      App.navigate('app.html');
+      App.showToast('Você já está autenticado. Use “Trocar de conta” para acessar com outro email.');
+      App.renderAuthUI(current.session);
       return;
     }
 
@@ -245,16 +285,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     loginForm.addEventListener('submit', (event) => App.handleLogin(event));
   }
 
-  // Se estiver na página de login, redireciona usuários já autenticados para o app.
   const isAuthPage = location.pathname.endsWith('index.html') || location.pathname.endsWith('/');
-  if (isAuthPage) {
-    await App.redirectIfLoggedIn();
-  }
 
-  // Recupera sessão ativa e atualiza header.
+  // Recupera sessão ativa e atualiza header e UI de auth.
   const { session } = await DB.getSession();
   App.state.user = session?.user ?? null;
   App.updateHeader(App.state.user);
+  if (isAuthPage) {
+    App.renderAuthUI(session);
+  }
 
   // Se estivermos em páginas protegidas, força autenticação.
   const protectedPage = location.pathname.endsWith('app.html') || location.pathname.endsWith('project.html') || location.pathname.endsWith('planner.html');
@@ -266,12 +305,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   DB.onAuthStateChange(async (_event, newSession) => {
     App.state.user = newSession?.user ?? null;
     App.updateHeader(App.state.user);
+
+    const isAuthPage = location.pathname.endsWith('index.html') || location.pathname.endsWith('/');
+    App.renderAuthUI(newSession);
+
     if (newSession?.user) {
       await App.ensureProfile(newSession.user);
       App.showToast('Login concluído com sucesso.');
-      // Se o login ocorreu na página de autenticação, encaminha para o app.
-      const isAuthPage = location.pathname.endsWith('index.html') || location.pathname.endsWith('/');
-      if (isAuthPage) App.navigate('app.html');
+      // Em páginas protegidas, manter navegação; na página de auth mostramos card logado.
     }
   });
 });

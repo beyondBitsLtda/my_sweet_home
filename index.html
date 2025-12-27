@@ -47,6 +47,22 @@
           <p class="muted small">Abra o e-mail mais recente e clique no link em poucos minutos. Após validar, você será direcionado ao app.</p>
         </div>
       </div>
+
+      <!-- Card mostrado quando já existe sessão ativa: evita enviar OTP por cima -->
+      <div class="card auth-card hidden" id="logged-card">
+        <p class="eyebrow">Sessão ativa</p>
+        <h1>Você está logado</h1>
+        <p class="muted">A sessão já está ativa. Para usar outro e-mail, encerre a sessão primeiro.</p>
+        <div class="logged-info">
+          <span class="label">Conta atual</span>
+          <span class="pill" id="logged-email">carregando...</span>
+        </div>
+        <div class="card-actions">
+          <button class="btn primary" type="button" onclick="App.navigate('app.html')">Ir para o app</button>
+          <button class="btn secondary" type="button" onclick="App.switchAccount()">Trocar de conta</button>
+          <button class="btn ghost" type="button" onclick="App.handleLogout(event)">Sair</button>
+        </div>
+      </div>
     </section>
   </main>
 

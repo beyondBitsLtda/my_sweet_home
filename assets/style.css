@@ -232,6 +232,10 @@ a {
   margin: var(--space-2) 0;
 }
 
+.auth-card.hidden {
+  display: none;
+}
+
 .auth-form {
   display: grid;
   gap: var(--space-3);
@@ -257,6 +261,13 @@ a {
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: #fdfbf8;
+}
+
+.logged-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
 }
 
 .card-header,
