@@ -177,8 +177,8 @@ const App = {
 
   /**
    * switchAuthTab
-   * - Alterna o texto de apoio do formulário entre “Entrar” e “Criar conta”.
-   * - O fluxo técnico é o mesmo (magic link), mas a cópia comunica a intenção do usuário.
+   * - Alterna o texto e os campos entre Entrar, Criar conta e Esqueci minha senha.
+   * - O fluxo técnico muda conforme o modo (login, signup, reset).
    */
   switchAuthTab(event) {
     const mode = event?.target?.dataset?.mode;
@@ -186,37 +186,52 @@ const App = {
     document.querySelectorAll('.auth-tabs .tab').forEach((tab) => {
       tab.classList.toggle('active', tab.dataset.mode === mode);
     });
+
     const helper = document.getElementById('auth-helper');
-    const submit = document.querySelector('#login-form button[type="submit"]');
+    const submit = document.getElementById('auth-submit');
+    const passwordGroup = document.getElementById('password-group');
+    const confirmGroup = document.getElementById('confirm-group');
+
     if (mode === 'signup') {
-      helper.textContent = 'Se esse email já estiver cadastrado, você receberá um link para entrar. Se não estiver, o link cria sua conta automaticamente.';
+      helper.textContent = 'Use email e senha fortes. Se o email já existir, mostraremos a mensagem para fazer login.';
       submit.textContent = 'Criar conta';
+      passwordGroup.classList.remove('hidden');
+      confirmGroup.classList.remove('hidden');
+      submit.classList.remove('secondary');
+      submit.classList.add('primary');
+    } else if (mode === 'reset') {
+      helper.textContent = 'Enviaremos um link de redefinição para o seu email.';
+      submit.textContent = 'Enviar link de redefinição';
+      passwordGroup.classList.add('hidden');
+      confirmGroup.classList.add('hidden');
+      submit.classList.remove('primary');
+      submit.classList.add('secondary');
     } else {
-      helper.textContent = 'Se esse email já estiver cadastrado, você receberá um link para entrar. Se não estiver, o link cria sua conta automaticamente.';
-      submit.textContent = 'Enviar link';
+      helper.textContent = 'Digite seu email e senha para entrar.';
+      submit.textContent = 'Entrar';
+      passwordGroup.classList.remove('hidden');
+      confirmGroup.classList.add('hidden');
+      submit.classList.remove('secondary');
+      submit.classList.add('primary');
     }
+
+    submit.dataset.mode = mode;
   },
 
   /**
    * handleLogin
-   * - Captura o submit do formulário de e-mail e dispara o magic link.
+   * - Captura o submit do formulário e dispara o fluxo adequado (login, signup ou reset).
    */
   async handleLogin(event) {
     event.preventDefault();
-    // Se já houver sessão ativa, mostramos o card logado e evitamos reenviar Magic Link.
     const current = await DB.getSession();
     if (current.session?.user) {
-      App.showToast('Você já está autenticado. Use “Trocar de conta” para acessar com outro email.');
-      App.renderAuthUI(current.session);
+      App.showToast('Você já está autenticado. Redirecionando para o app.');
+      App.navigate('app.html');
       return;
     }
 
-    if (App.state.isSendingOtp) {
-      // Mensagem educativa para o rate limit de 3s imposto pelo Supabase.
-      App.showToast('Por segurança, o sistema limita o envio de emails em sequência. Aguarde alguns segundos antes de solicitar um novo link.');
-      return;
-    }
-
+    const mode = document.getElementById('auth-submit')?.dataset?.mode || 'login';
     const email = (document.getElementById('email')?.value || '').trim();
     if (!email) {
       App.showToast('Informe um e-mail válido.');
@@ -228,26 +243,68 @@ const App = {
     if (submitButton) submitButton.disabled = true;
 
     try {
-      const { error } = await DB.authSignIn(email);
-      if (error) {
-        if (error.status === 429) {
-          App.showToast('Por segurança, o sistema limita o envio de emails em sequência. Aguarde alguns segundos antes de solicitar um novo link.');
-        } else {
-          App.showToast('Não conseguimos enviar o link. Tente novamente.');
+      if (mode === 'reset') {
+        const { error } = await DB.authResetPassword(email);
+        if (error) {
+          App.showToast('Não foi possível enviar o link de redefinição. Tente novamente.');
+          console.error(error);
+          return;
         }
-        console.error(error);
+        App.showToast('Enviamos um link de redefinição para seu email.');
+        document.querySelector('.tab[data-mode="login"]')?.click();
+        event.target.reset();
         return;
       }
 
-      // Mensagem clara sobre OTP: se existir conta faz login; senão, cria.
-      App.showToast('Enviamos um link para seu email. Se esse email já tiver cadastro, o link fará login. Caso contrário, o link criará sua conta automaticamente.');
-      event.target.reset();
+      const password = (document.getElementById('password')?.value || '').trim();
+      if (!password) {
+        App.showToast('Senha é obrigatória.');
+        return;
+      }
+
+      if (mode === 'signup') {
+        const confirm = (document.getElementById('confirm')?.value || '').trim();
+        if (password.length < 8) {
+          App.showToast('Senha fraca. Use pelo menos 8 caracteres.');
+          return;
+        }
+        if (password !== confirm) {
+          App.showToast('As senhas não conferem.');
+          return;
+        }
+
+        const { data, error } = await DB.authSignUp(email, password);
+        if (error) {
+          if (error.message?.toLowerCase().includes('already registered')) {
+            App.showToast('Esse email já está cadastrado. Faça login.');
+          } else {
+            App.showToast('Não foi possível criar a conta. Tente novamente.');
+          }
+          console.error(error);
+          return;
+        }
+        await DB.upsertProfile(data.user);
+        App.showToast('Conta criada com sucesso. Redirecionando...');
+        App.navigate('app.html');
+        return;
+      }
+
+      // Login
+      const { data, error } = await DB.authSignInWithPassword(email, password);
+      if (error) {
+        App.showToast('Email ou senha inválidos.');
+        console.error(error);
+        return;
+      }
+      await DB.upsertProfile(data.user);
+      App.showToast('Login concluído. Redirecionando...');
+      App.navigate('app.html');
     } finally {
-      // Cooldown mínimo para respeitar o rate limit (>=3s).
+      // Cooldown mínimo para evitar spam de requisições.
       setTimeout(() => {
         App.state.isSendingOtp = false;
         if (submitButton) submitButton.disabled = false;
-      }, 3500);
+      }, 1200);
     }
   },
 

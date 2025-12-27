@@ -21,28 +21,23 @@ const DB = (() => {
     return client;
   }
 
-  /**
-   * authSignIn
-   * - Fluxo mais simples e seguro para frontend puro: magic link via e-mail.
-   * - O Supabase envia o link para o endereço informado; não manipulamos senhas no browser.
-   * - IMPORTANTE: definimos emailRedirectTo dinamicamente para funcionar tanto em localhost quanto em GitHub Pages.
-   */
-  async function authSignIn(email) {
+  // Fluxos baseados em email+senha (substituindo o OTP para este cenário).
+  async function authSignInWithPassword(email, password) {
     const supabase = initSupabase();
-    // Calculamos a raiz do site com base na URL atual.
-    // Usamos new URL('./', window.location.href) para obter o diretório onde o index.html vive.
-    // Isso evita redirecionamentos quebrados em ambientes estáticos (ex.: https://usuario.github.io/repo/).
-    // Em seguida, definimos explicitamente o arquivo index.html, já que o hash de retorno é processado lá.
+    return supabase.auth.signInWithPassword({ email, password });
+  }
+
+  async function authSignUp(email, password) {
+    const supabase = initSupabase();
+    return supabase.auth.signUp({ email, password });
+  }
+
+  async function authResetPassword(email) {
+    const supabase = initSupabase();
+    // Usa redirect para index.html, onde o usuário pode redefinir (fluxo simplificado).
     const baseUrl = new URL('./', window.location.href);
     const redirectTo = new URL('index.html', baseUrl).toString();
-
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: redirectTo
-      }
-    });
-    return { error };
+    return supabase.auth.resetPasswordForEmail(email, { redirectTo });
   }
 
   /** Faz logout limpando a sessão atual. */
@@ -93,7 +88,9 @@ const DB = (() => {
 
   return {
     initSupabase,
-    authSignIn,
+    authSignInWithPassword,
+    authSignUp,
+    authResetPassword,
     authSignOut,
     getSession,
     onAuthStateChange,
