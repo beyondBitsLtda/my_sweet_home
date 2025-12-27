@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Planta · My Sweet Home</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+</head>
+<body class="page">
+  <header class="site-header">
+    <div class="container header-grid">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <span class="brand-name">My Sweet Home</span>
+      </div>
+      <nav class="nav">
+        <a class="nav-link" href="app.html">Home</a>
+        <a class="nav-link" href="project.html">Projeto</a>
+        <a class="nav-link active" href="planner.html">Planta</a>
+      </nav>
+      <div class="session-actions" id="session-actions">
+        <span class="muted">Carregando...</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Planta interativa</p>
+          <h1>Layout visual do apartamento</h1>
+          <p class="muted">Esta página simula a etapa da planta: um canvas claro para arrastar e dimensionar cômodos. Mantemos retângulos estáticos como placeholders.</p>
+        </div>
+        <button class="btn secondary" type="button" onclick="App.showToast('Salvar layout disponível na V2')">Salvar layout</button>
+      </div>
+
+      <div class="planner-grid">
+        <aside class="card planner-sidebar">
+          <p class="eyebrow">Cômodos</p>
+          <ul class="structure-list">
+            <li><span class="label">Sala</span><span class="badge">32 m²</span></li>
+            <li><span class="label">Cozinha</span><span class="badge">12 m²</span></li>
+            <li><span class="label">Suíte</span><span class="badge">18 m²</span></li>
+          </ul>
+          <button class="btn ghost" type="button">Adicionar cômodo</button>
+        </aside>
+
+        <section class="card planner-canvas">
+          <div class="planner-header">
+            <p class="eyebrow">Canvas</p>
+            <div class="pill-row">
+              <span class="pill">Grid 12 × 12</span>
+              <span class="pill outline">Retângulos estáticos</span>
+            </div>
+          </div>
+          <div class="canvas" role="img" aria-label="Planta representando o apartamento">
+            <div class="room room-large">Sala</div>
+            <div class="room room-medium">Cozinha</div>
+            <div class="room room-medium">Suíte</div>
+            <div class="room room-small danger">Canto pendente</div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Notas rápidas</h3>
+        <button class="btn ghost" type="button" onclick="App.hideModal()">Fechar</button>
+      </div>
+      <p class="muted">Use este espaço para testar a camada de feedback visual do projeto.</p>
+      <div class="modal-actions">
+        <button class="btn primary" type="button">Salvar</button>
+        <button class="btn secondary" type="button" onclick="App.hideModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/project.js"></script>
+</body>
+</html>

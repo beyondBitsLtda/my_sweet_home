@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Sweet Home — Acessar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+</head>
+<body class="page auth-page">
+  <header class="site-header">
+    <div class="container header-grid">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <span class="brand-name">My Sweet Home</span>
+      </div>
+      <div class="session-actions">
+        <span class="muted">Acesso protegido</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="section auth-hero">
+      <!-- Card de sessão ativa: não exibe formulários quando já logado -->
+      <div class="card auth-card hidden" id="logged-card">
+        <p class="eyebrow">Sessão ativa</p>
+        <h1>Você já está logado</h1>
+        <p class="muted">Estamos redirecionando você para o aplicativo.</p>
+        <div class="logged-info">
+          <span class="label">Conta</span>
+          <span class="pill" id="logged-email">carregando...</span>
+        </div>
+        <div class="card-actions">
+          <button class="btn primary" type="button" onclick="App.navigate('app.html')">Ir para o app</button>
+          <button class="btn secondary" type="button" data-action="logout">Trocar de conta</button>
+        </div>
+      </div>
+
+      <!-- Card de autenticação com três modos: entrar, criar conta, reset -->
+      <div class="card auth-card" id="login-card">
+        <p class="eyebrow">Acesso</p>
+        <h1>Entre ou crie sua conta</h1>
+        <p class="muted">Fluxo tradicional com email e senha, mantendo o visual editorial leve.</p>
+
+        <div class="tabs auth-tabs" role="tablist">
+          <button class="tab active" data-mode="login" onclick="App.switchAuthTab(event)">Entrar</button>
+          <button class="tab" data-mode="signup" onclick="App.switchAuthTab(event)">Criar conta</button>
+          <button class="tab" data-mode="reset" onclick="App.switchAuthTab(event)">Esqueci minha senha</button>
+        </div>
+
+        <form id="loginForm" class="auth-form">
+          <label class="muted" for="loginEmail">E-mail</label>
+          <input class="input" type="email" id="loginEmail" name="email" placeholder="voce@exemplo.com" required />
+
+          <div id="password-group">
+            <label class="muted" for="loginPassword">Senha</label>
+            <input class="input" type="password" id="loginPassword" name="password" placeholder="Mínimo 8 caracteres" required />
+          </div>
+
+          <div id="confirm-group" class="hidden">
+            <label class="muted" for="confirm">Confirmar senha</label>
+            <input class="input" type="password" id="confirm" name="confirm" placeholder="Repita a senha" />
+          </div>
+
+          <p class="muted small" id="auth-helper">Digite suas credenciais para continuar.</p>
+          <p class="muted small hidden" id="signup-note">Você receberá um email para confirmar sua conta antes do primeiro acesso.</p>
+          <button class="btn primary" type="submit" id="auth-submit">Entrar</button>
+        </form>
+
+        <div class="info-banner">
+          <p class="label">Dicas de segurança</p>
+          <p class="muted small">Senhas fortes devem ter pelo menos 8 caracteres. Para redefinir, use a aba “Esqueci minha senha”.</p>
+        </div>
+      </div>
+
+      <!-- Catálogo de projetos -->
+      <section class="section hidden" id="projects-section">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Projetos</p>
+            <h2>Seu catálogo de reformas</h2>
+            <p class="muted">V1 permite apenas apartamentos. Casa e Sítio aparecem como “Disponível em breve”.</p>
+          </div>
+        </div>
+        <div class="grid cards" id="projects-grid">
+          <!-- Cards inseridos via JS -->
+        </div>
+      </section>
+
+      <!-- Formulário de criação -->
+      <section class="section hidden" id="create-section">
+        <div class="card">
+          <p class="eyebrow">Criar projeto</p>
+          <h2>Comece um novo apartamento</h2>
+          <form class="auth-form" id="createProjectForm">
+            <label class="muted" for="projectName">Nome do projeto</label>
+            <input class="input" id="projectName" name="name" placeholder="Meu AP 2026" required />
+
+            <label class="muted" for="homeType">Tipo de casa</label>
+            <select class="input" id="homeType" name="home_type">
+              <option value="apartment">Apartamento (habilitado)</option>
+              <option value="house">Casa (Disponível em breve)</option>
+              <option value="farm">Sítio (Disponível em breve)</option>
+            </select>
+
+            <label class="muted" for="mode">Modo</label>
+            <select class="input" id="mode" name="mode">
+              <option value="macro">Macro</option>
+              <option value="micro">Micro</option>
+            </select>
+
+            <label class="muted" for="startDate">Início</label>
+            <input class="input" type="date" id="startDate" name="start_date" />
+
+            <label class="muted" for="endDate">Fim</label>
+            <input class="input" type="date" id="endDate" name="end_date" />
+
+            <label class="muted" for="budgetExpected">Budget planejado</label>
+            <input class="input" type="number" id="budgetExpected" name="budget_expected" placeholder="30000" />
+
+            <label class="muted" for="budgetReal">Budget real</label>
+            <input class="input" type="number" id="budgetReal" name="budget_real" placeholder="0" />
+
+            <button class="btn primary" type="submit">Criar</button>
+          </form>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/app.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/project.js"></script>
+</body>
+</html>
