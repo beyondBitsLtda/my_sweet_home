@@ -3,159 +3,54 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>My Sweet Home — Bem-vindo</title>
-  <!-- Tipografias selecionadas para evocar o ar editorial/premium do Westwing -->
+  <title>My Sweet Home — Acessar</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/style.css" />
-  <!-- supabase-js via CDN para uso em ambiente estático (frontend puro) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
-<body class="page">
+<body class="page auth-page">
   <header class="site-header">
     <div class="container header-grid">
       <div class="brand">
         <div class="brand-mark"></div>
         <span class="brand-name">My Sweet Home</span>
       </div>
-      <nav class="nav">
-        <a class="nav-link active" href="index.html">Home</a>
-        <a class="nav-link" href="project.html">Projeto</a>
-        <a class="nav-link" href="planner.html">Planta</a>
-      </nav>
-      <div class="session-actions" id="session-actions">
-        <!-- O conteúdo é atualizado pelo app.js conforme o estado do usuário -->
-        <button class="btn ghost" type="button" onclick="App.focusLogin()">Entrar</button>
-        <button class="btn primary" type="button" onclick="App.focusLogin()">Criar conta</button>
+      <div class="session-actions">
+        <span class="muted">Acesso protegido</span>
       </div>
     </div>
   </header>
 
   <main class="container">
-    <section class="section">
-      <div class="auth-grid">
-        <div class="card auth-card" id="login-card">
-          <p class="eyebrow">Acesso</p>
-          <h2>Entre com seu e-mail</h2>
-          <p class="muted">Usamos magic link via Supabase para manter o fluxo leve e seguro no frontend puro.</p>
-          <form id="login-form" class="auth-form">
-            <label class="muted" for="email">E-mail</label>
-            <input class="input" type="email" id="email" name="email" placeholder="voce@exemplo.com" required />
-            <button class="btn primary" type="submit">Receber link</button>
-          </form>
-          <p class="muted small">Após confirmar o link enviado, retornaremos autenticado e manteremos sua sessão.</p>
-        </div>
-      </div>
-    </section>
+    <section class="section auth-hero">
+      <div class="card auth-card" id="login-card">
+        <p class="eyebrow">Acesso</p>
+        <h1>Entre ou crie sua conta</h1>
+        <p class="muted">Usamos Magic Link do Supabase para manter o fluxo seguro e sem senhas. Você receberá um e-mail com o link.</p>
 
-    <section class="hero card">
-      <div class="hero-text">
-        <p class="eyebrow">V1 · Apartamento</p>
-        <h1>Organize desejos, compras e reformas com leveza.</h1>
-        <p class="lead">Um aplicativo educacional para planejar sua casa no estilo editorial do Westwing: clean, motivador e repleto de feedbacks visuais.</p>
-        <div class="hero-actions">
-          <button class="btn primary" type="button" onclick="App.navigate('project.html')">Ver projeto exemplo</button>
-          <button class="btn secondary" type="button" onclick="App.focusLogin()">Criar novo projeto</button>
+        <div class="tabs auth-tabs" role="tablist">
+          <button class="tab active" data-mode="login" onclick="App.switchAuthTab(event)">Entrar</button>
+          <button class="tab" data-mode="signup" onclick="App.switchAuthTab(event)">Criar conta</button>
         </div>
-        <div class="tags">
-          <span class="badge">Gamificação</span>
-          <span class="badge">Kanban</span>
-          <span class="badge">Planta interativa</span>
+
+        <form id="login-form" class="auth-form">
+          <label class="muted" for="email">E-mail</label>
+          <input class="input" type="email" id="email" name="email" placeholder="voce@exemplo.com" required />
+          <p class="muted small" id="auth-helper">Receba um link seguro para entrar.</p>
+          <button class="btn primary" type="submit">Enviar link</button>
+        </form>
+
+        <div class="info-banner">
+          <p class="label">Como funciona</p>
+          <p class="muted small">Abra o e-mail mais recente e clique no link em poucos minutos. Após validar, você será direcionado ao app.</p>
         </div>
-      </div>
-      <div class="hero-visual">
-        <div class="visual-card">
-          <p class="eyebrow">Saúde do projeto</p>
-          <h2>72% concluído</h2>
-          <p class="muted">Fotos “antes e depois” desbloqueiam pontos extras.</p>
-          <div class="progress-bar">
-            <span style="width:72%"></span>
-          </div>
-          <div class="metrics-grid">
-            <div>
-              <p class="label">Pontos</p>
-              <p class="metric">480</p>
-            </div>
-            <div>
-              <p class="label">Tarefas atrasadas</p>
-              <p class="metric danger">2</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="section-header">
-        <div>
-          <p class="eyebrow">Projetos</p>
-          <h2>Seu lar, organizado por capítulos.</h2>
-          <p class="muted">Comece pela versão Apartamento. Casa e Sítio aparecem como “em breve”, mas já deixamos o espaço pronto.</p>
-        </div>
-        <button class="btn ghost" type="button">Importar do Supabase</button>
-      </div>
-
-      <div class="grid cards">
-        <article class="card project-card">
-          <div class="card-top">
-            <p class="eyebrow">Ativo</p>
-            <span class="badge outline">Apartamento</span>
-          </div>
-          <h3>Meu AP 2026</h3>
-          <p class="muted">Projeto macro com sala, cozinha, suíte e home office. Acompanhando custos e fotos antes/depois.</p>
-          <div class="pill-row">
-            <span class="pill">Progresso 72%</span>
-            <span class="pill">Pontos 480</span>
-            <span class="pill danger">2 atrasos</span>
-          </div>
-          <div class="card-actions">
-            <button class="btn primary" type="button" onclick="App.navigate('project.html')">Abrir</button>
-            <button class="btn ghost" type="button">Duplicar</button>
-          </div>
-        </article>
-
-        <article class="card project-card muted-card">
-          <div class="card-top">
-            <p class="eyebrow">Em breve</p>
-            <span class="badge outline">Casa</span>
-          </div>
-          <h3>Casa</h3>
-          <p class="muted">Estrutura preparada para lançar na V2. Mantemos o card para alinhar expectativas e testar o layout.</p>
-          <div class="card-actions">
-            <button class="btn secondary" type="button">Avisar-me</button>
-          </div>
-        </article>
-
-        <article class="card project-card muted-card">
-          <div class="card-top">
-            <p class="eyebrow">Em breve</p>
-            <span class="badge outline">Sítio</span>
-          </div>
-          <h3>Sítio</h3>
-          <p class="muted">Planejado para a V2 com áreas externas e eventos sazonais.</p>
-          <div class="card-actions">
-            <button class="btn secondary" type="button">Avisar-me</button>
-          </div>
-        </article>
       </div>
     </section>
   </main>
 
   <div id="toast" class="toast hidden"></div>
-  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Modal de exemplo</h3>
-        <button class="btn ghost" type="button" onclick="App.hideModal()">Fechar</button>
-      </div>
-      <p class="muted">Este modal é apenas um placeholder para demonstrar o design system.</p>
-      <div class="modal-actions">
-        <button class="btn primary" type="button">Confirmar</button>
-        <button class="btn secondary" type="button" onclick="App.hideModal()">Cancelar</button>
-      </div>
-    </div>
-  </div>
 
   <script src="js/app.js"></script>
   <script src="js/db.js"></script>

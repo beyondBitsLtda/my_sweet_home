@@ -17,8 +17,7 @@ const App = {
 
   /**
    * requireAuth
-   * - Em páginas protegidas (project.html, planner.html), redireciona quem não estiver autenticado.
-   * - Mantém o visual leve sem criar telas novas: o retorno é para a home (index.html) para logar.
+   * - Em páginas protegidas (app.html, project.html, planner.html), redireciona quem não estiver autenticado.
    */
   async requireAuth() {
     const { session } = await DB.getSession();
@@ -28,6 +27,18 @@ const App = {
     }
     App.state.user = session.user;
     App.updateHeader(session.user);
+  },
+
+  /**
+   * redirectIfLoggedIn
+   * - Usado na página de login (index.html) para mandar usuários autenticados direto para o app.
+   */
+  async redirectIfLoggedIn() {
+    const { session } = await DB.getSession();
+    if (session?.user) {
+      App.state.user = session.user;
+      App.navigate('app.html');
+    }
   },
 
   /**
@@ -86,8 +97,8 @@ const App = {
 
     if (!user) {
       container.innerHTML = `
-        <button class="btn ghost" type="button" onclick="App.focusLogin()">Entrar</button>
-        <button class="btn primary" type="button" onclick="App.focusLogin()">Criar conta</button>
+        <button class="btn ghost" type="button" onclick="App.navigate('index.html')">Entrar</button>
+        <button class="btn primary" type="button" onclick="App.navigate('index.html')">Criar conta</button>
       `;
       return;
     }
@@ -119,6 +130,28 @@ const App = {
   focusLogin() {
     const loginCard = document.getElementById('login-card');
     if (loginCard) loginCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+
+  /**
+   * switchAuthTab
+   * - Alterna o texto de apoio do formulário entre “Entrar” e “Criar conta”.
+   * - O fluxo técnico é o mesmo (magic link), mas a cópia comunica a intenção do usuário.
+   */
+  switchAuthTab(event) {
+    const mode = event?.target?.dataset?.mode;
+    if (!mode) return;
+    document.querySelectorAll('.auth-tabs .tab').forEach((tab) => {
+      tab.classList.toggle('active', tab.dataset.mode === mode);
+    });
+    const helper = document.getElementById('auth-helper');
+    const submit = document.querySelector('#login-form button[type="submit"]');
+    if (mode === 'signup') {
+      helper.textContent = 'Você receberá um link no email para confirmar e criar a conta.';
+      submit.textContent = 'Criar conta';
+    } else {
+      helper.textContent = 'Receba um link seguro para entrar.';
+      submit.textContent = 'Enviar link';
+    }
   },
 
   /**
@@ -179,13 +212,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     loginForm.addEventListener('submit', (event) => App.handleLogin(event));
   }
 
+  // Se estiver na página de login, redireciona usuários já autenticados para o app.
+  const isAuthPage = location.pathname.endsWith('index.html') || location.pathname.endsWith('/');
+  if (isAuthPage) {
+    await App.redirectIfLoggedIn();
+  }
+
   // Recupera sessão ativa e atualiza header.
   const { session } = await DB.getSession();
   App.state.user = session?.user ?? null;
   App.updateHeader(App.state.user);
 
   // Se estivermos em páginas protegidas, força autenticação.
-  const protectedPage = location.pathname.endsWith('project.html') || location.pathname.endsWith('planner.html');
+  const protectedPage = location.pathname.endsWith('app.html') || location.pathname.endsWith('project.html') || location.pathname.endsWith('planner.html');
   if (protectedPage) {
     await App.requireAuth();
   }
@@ -197,6 +236,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (newSession?.user) {
       await App.ensureProfile(newSession.user);
       App.showToast('Login concluído com sucesso.');
+      // Se o login ocorreu na página de autenticação, encaminha para o app.
+      const isAuthPage = location.pathname.endsWith('index.html') || location.pathname.endsWith('/');
+      if (isAuthPage) App.navigate('app.html');
     }
   });
 });
