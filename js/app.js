@@ -163,28 +163,52 @@ const App = {
    */
   async handleLogin(event) {
     event.preventDefault();
+    // Bloqueio: se já houver sessão ativa, não reenviamos link (evita spam e mantém UX honesta).
+    const current = await DB.getSession();
+    if (current.session?.user) {
+      App.showToast('Você já está autenticado. Redirecionando para o aplicativo.');
+      App.navigate('app.html');
+      return;
+    }
+
+    if (App.state.isSendingOtp) {
+      // Mensagem educativa para o rate limit de 3s imposto pelo Supabase.
+      App.showToast('Por segurança, o sistema limita o envio de emails em sequência. Aguarde alguns segundos antes de solicitar um novo link.');
+      return;
+    }
+
     const email = (document.getElementById('email')?.value || '').trim();
     if (!email) {
       App.showToast('Informe um e-mail válido.');
       return;
     }
 
-    const { error } = await DB.authSignIn(email);
-    if (error) {
-      console.error(error);
-      App.showToast('Não conseguimos enviar o link. Tente novamente.');
-      return;
-    }
-
-    // Mensagem clara sobre OTP e cadastro automático.
-    App.showToast('Enviamos um link para seu email. Abra o mais recente e clique nele em até alguns minutos.');
-    // Evita múltiplos envios acidentais enquanto o usuário aguarda o e-mail.
     const submitButton = event.target.querySelector('button[type="submit"]');
-    if (submitButton) {
-      submitButton.disabled = true;
-      setTimeout(() => { submitButton.disabled = false; }, 4500);
+    App.state.isSendingOtp = true;
+    if (submitButton) submitButton.disabled = true;
+
+    try {
+      const { error } = await DB.authSignIn(email);
+      if (error) {
+        if (error.status === 429) {
+          App.showToast('Por segurança, o sistema limita o envio de emails em sequência. Aguarde alguns segundos antes de solicitar um novo link.');
+        } else {
+          App.showToast('Não conseguimos enviar o link. Tente novamente.');
+        }
+        console.error(error);
+        return;
+      }
+
+      // Mensagem clara sobre OTP: se existir conta faz login; senão, cria.
+      App.showToast('Enviamos um link para seu email. Se esse email já tiver cadastro, o link fará login. Caso contrário, o link criará sua conta automaticamente.');
+      event.target.reset();
+    } finally {
+      // Cooldown mínimo para respeitar o rate limit (>=3s).
+      setTimeout(() => {
+        App.state.isSendingOtp = false;
+        if (submitButton) submitButton.disabled = false;
+      }, 3500);
     }
-    event.target.reset();
   },
 
   /**
