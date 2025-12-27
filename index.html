@@ -9,6 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/style.css" />
+  <!-- supabase-js via CDN para uso em ambiente estático (frontend puro) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body class="page">
   <header class="site-header">
@@ -22,14 +24,31 @@
         <a class="nav-link" href="project.html">Projeto</a>
         <a class="nav-link" href="planner.html">Planta</a>
       </nav>
-      <div class="session-actions">
-        <button class="btn ghost" type="button">Entrar</button>
-        <button class="btn primary" type="button">Criar conta</button>
+      <div class="session-actions" id="session-actions">
+        <!-- O conteúdo é atualizado pelo app.js conforme o estado do usuário -->
+        <button class="btn ghost" type="button" onclick="App.focusLogin()">Entrar</button>
+        <button class="btn primary" type="button" onclick="App.focusLogin()">Criar conta</button>
       </div>
     </div>
   </header>
 
   <main class="container">
+    <section class="section">
+      <div class="auth-grid">
+        <div class="card auth-card" id="login-card">
+          <p class="eyebrow">Acesso</p>
+          <h2>Entre com seu e-mail</h2>
+          <p class="muted">Usamos magic link via Supabase para manter o fluxo leve e seguro no frontend puro.</p>
+          <form id="login-form" class="auth-form">
+            <label class="muted" for="email">E-mail</label>
+            <input class="input" type="email" id="email" name="email" placeholder="voce@exemplo.com" required />
+            <button class="btn primary" type="submit">Receber link</button>
+          </form>
+          <p class="muted small">Após confirmar o link enviado, retornaremos autenticado e manteremos sua sessão.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="hero card">
       <div class="hero-text">
         <p class="eyebrow">V1 · Apartamento</p>
@@ -37,7 +56,7 @@
         <p class="lead">Um aplicativo educacional para planejar sua casa no estilo editorial do Westwing: clean, motivador e repleto de feedbacks visuais.</p>
         <div class="hero-actions">
           <button class="btn primary" type="button" onclick="App.navigate('project.html')">Ver projeto exemplo</button>
-          <button class="btn secondary" type="button">Criar novo projeto</button>
+          <button class="btn secondary" type="button" onclick="App.focusLogin()">Criar novo projeto</button>
         </div>
         <div class="tags">
           <span class="badge">Gamificação</span>

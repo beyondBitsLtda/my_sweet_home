@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body class="page">
   <header class="site-header">
@@ -21,9 +22,9 @@
         <a class="nav-link active" href="project.html">Projeto</a>
         <a class="nav-link" href="planner.html">Planta</a>
       </nav>
-      <div class="session-actions">
-        <button class="btn ghost" type="button">Perfil</button>
-        <button class="btn primary" type="button">Sair</button>
+      <div class="session-actions" id="session-actions">
+        <button class="btn ghost" type="button" onclick="App.navigate('index.html')">Entrar</button>
+        <button class="btn primary" type="button" onclick="App.navigate('index.html')">Criar conta</button>
       </div>
     </div>
   </header>
