@@ -36,5 +36,18 @@ const ProjectDomain = {
       { title: 'Instalar iluminação', status: 'doing', weight: 'médio' },
       { title: 'Marcenaria home office', status: 'done', weight: 'pesado' }
     ];
+  },
+
+  // Progresso placeholder para cards enquanto não calculamos de verdade.
+  placeholderProgress() {
+    return 72;
+  },
+
+  // Formata período.
+  formatPeriod(start, end) {
+    if (!start && !end) return 'Sem datas';
+    const s = start || '—';
+    const e = end || '—';
+    return `${s} · ${e}`;
   }
 };

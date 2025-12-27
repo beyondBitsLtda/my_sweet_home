@@ -62,6 +62,30 @@ const DB = (() => {
     return { session: data?.session ?? null, error };
   }
 
+  // ---------------------------
+  // CRUD de projetos (V1)
+  // ---------------------------
+
+  async function createProject(project) {
+    const supabase = initSupabase();
+    // Inserção simples; supõe que RLS/policies já limitam ao usuário autenticado.
+    return supabase.from('projects').insert(project).select().single();
+  }
+
+  async function listProjects(userId) {
+    const supabase = initSupabase();
+    return supabase
+      .from('projects')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+  }
+
+  async function getProjectById(id) {
+    const supabase = initSupabase();
+    return supabase.from('projects').select('*').eq('id', id).single();
+  }
+
   /**
    * Escuta mudanças de autenticação.
    * - Ideal para reagir a magic link ou logout em múltiplas abas.
@@ -102,6 +126,9 @@ const DB = (() => {
     authSignOut,
     getSession,
     onAuthStateChange,
-    upsertProfile
+    upsertProfile,
+    createProject,
+    listProjects,
+    getProjectById
   };
 })();

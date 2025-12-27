@@ -76,6 +76,59 @@
           <p class="muted small">Senhas fortes devem ter pelo menos 8 caracteres. Para redefinir, use a aba “Esqueci minha senha”.</p>
         </div>
       </div>
+
+      <!-- Catálogo de projetos -->
+      <section class="section hidden" id="projects-section">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Projetos</p>
+            <h2>Seu catálogo de reformas</h2>
+            <p class="muted">V1 permite apenas apartamentos. Casa e Sítio aparecem como “Disponível em breve”.</p>
+          </div>
+        </div>
+        <div class="grid cards" id="projects-grid">
+          <!-- Cards inseridos via JS -->
+        </div>
+      </section>
+
+      <!-- Formulário de criação -->
+      <section class="section hidden" id="create-section">
+        <div class="card">
+          <p class="eyebrow">Criar projeto</p>
+          <h2>Comece um novo apartamento</h2>
+          <form class="auth-form" id="createProjectForm">
+            <label class="muted" for="projectName">Nome do projeto</label>
+            <input class="input" id="projectName" name="name" placeholder="Meu AP 2026" required />
+
+            <label class="muted" for="homeType">Tipo de casa</label>
+            <select class="input" id="homeType" name="home_type">
+              <option value="apartment">Apartamento (habilitado)</option>
+              <option value="house">Casa (Disponível em breve)</option>
+              <option value="farm">Sítio (Disponível em breve)</option>
+            </select>
+
+            <label class="muted" for="mode">Modo</label>
+            <select class="input" id="mode" name="mode">
+              <option value="macro">Macro</option>
+              <option value="micro">Micro</option>
+            </select>
+
+            <label class="muted" for="startDate">Início</label>
+            <input class="input" type="date" id="startDate" name="start_date" />
+
+            <label class="muted" for="endDate">Fim</label>
+            <input class="input" type="date" id="endDate" name="end_date" />
+
+            <label class="muted" for="budgetExpected">Budget planejado</label>
+            <input class="input" type="number" id="budgetExpected" name="budget_expected" placeholder="30000" />
+
+            <label class="muted" for="budgetReal">Budget real</label>
+            <input class="input" type="number" id="budgetReal" name="budget_real" placeholder="0" />
+
+            <button class="btn primary" type="submit">Criar</button>
+          </form>
+        </div>
+      </section>
     </section>
   </main>
 
