@@ -25,10 +25,21 @@ const DB = (() => {
    * authSignIn
    * - Fluxo mais simples e seguro para frontend puro: magic link via e-mail.
    * - O Supabase envia o link para o endereço informado; não manipulamos senhas no browser.
+   * - IMPORTANTE: definimos emailRedirectTo dinamicamente para funcionar tanto em localhost quanto em GitHub Pages.
    */
   async function authSignIn(email) {
     const supabase = initSupabase();
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    // Calculamos a raiz do site com base na URL atual.
+    // Usamos new URL('./', window.location.href) para obter o diretório onde o index.html vive.
+    // Isso evita redirecionamentos quebrados em ambientes estáticos (ex.: https://usuario.github.io/repo/).
+    const redirectTo = new URL('./', window.location.href).toString();
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: redirectTo
+      }
+    });
     return { error };
   }
 
