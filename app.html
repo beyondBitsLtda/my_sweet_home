@@ -32,37 +32,52 @@
     <section class="section">
       <div class="section-header">
         <div>
-          <p class="eyebrow">Bem-vindo</p>
-          <h1>Seu lar, organizado</h1>
-          <p class="muted">Use a navegação acima para acessar o projeto, Kanban, dashboard e planta. Esta é a futura lista de projetos.</p>
-        </div>
-        <div class="pill-row">
-          <span class="pill">Versão V1</span>
-          <span class="pill outline">Supabase pronto</span>
+          <p class="eyebrow">Seus projetos</p>
+          <h1>Catálogo de reformas</h1>
+          <p class="muted">Cards no estilo vitrine clean. Apenas Apartamento habilitado na V1.</p>
         </div>
       </div>
 
-      <div class="grid cards">
-        <article class="card project-card">
-          <div class="card-top">
-            <p class="eyebrow">Ativo</p>
-            <span class="badge outline">Apartamento</span>
-          </div>
-          <h3>Meu AP 2026</h3>
-          <p class="muted">Abra o projeto para ver Estrutura, Kanban e Dashboard.</p>
-          <div class="card-actions">
-            <button class="btn primary" type="button" onclick="App.navigate('project.html')">Abrir projeto</button>
-            <button class="btn ghost" type="button">Duplicar</button>
-          </div>
-        </article>
-        <article class="card project-card muted-card">
-          <div class="card-top">
-            <p class="eyebrow">Em breve</p>
-            <span class="badge outline">Casa</span>
-          </div>
-          <h3>Casa</h3>
-          <p class="muted">Disponível na V2 com áreas externas.</p>
-        </article>
+      <div class="grid cards" id="projects-grid">
+        <!-- preenchido via JS -->
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card">
+        <p class="eyebrow">Criar novo</p>
+        <h2>Comece um novo apartamento</h2>
+        <form class="auth-form" id="createProjectForm">
+          <label class="muted" for="projectName">Nome do projeto</label>
+          <input class="input" id="projectName" name="name" placeholder="Meu AP 2026" required />
+
+          <label class="muted" for="homeType">Tipo de casa</label>
+          <select class="input" id="homeType" name="home_type">
+            <option value="apartment">Apartamento (habilitado)</option>
+            <option value="house" disabled>Casa (Disponível em breve)</option>
+            <option value="farm" disabled>Sítio (Disponível em breve)</option>
+          </select>
+
+          <label class="muted" for="mode">Modo</label>
+          <select class="input" id="mode" name="mode">
+            <option value="macro">Macro</option>
+            <option value="micro">Micro</option>
+          </select>
+
+          <label class="muted" for="startDate">Início</label>
+          <input class="input" type="date" id="startDate" name="start_date" />
+
+          <label class="muted" for="endDate">Fim</label>
+          <input class="input" type="date" id="endDate" name="end_date" />
+
+          <label class="muted" for="budgetExpected">Budget planejado</label>
+          <input class="input" type="number" id="budgetExpected" name="budget_expected" placeholder="30000" />
+
+          <label class="muted" for "budgetReal">Budget real</label>
+          <input class="input" type="number" id="budgetReal" name="budget_real" placeholder="0" />
+
+          <button class="btn primary" type="submit" id="createProjectSubmit">Criar</button>
+        </form>
       </div>
     </section>
   </main>

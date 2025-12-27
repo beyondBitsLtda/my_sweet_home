@@ -68,12 +68,17 @@ const DB = (() => {
 
   async function createProject(project) {
     const supabase = initSupabase();
-    // Inserção simples; supõe que RLS/policies já limitam ao usuário autenticado.
-    return supabase.from('projects').insert(project).select().single();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) return { data: null, error: new Error('Usuário não autenticado') };
+    const payload = { ...project, user_id: userId };
+    console.info('createProject payload', payload);
+    return supabase.from('projects').insert(payload).select().single();
   }
 
   async function listProjects(userId) {
     const supabase = initSupabase();
+    console.info('listProjects for user', userId);
     return supabase
       .from('projects')
       .select('*')
@@ -83,6 +88,7 @@ const DB = (() => {
 
   async function getProjectById(id) {
     const supabase = initSupabase();
+    console.info('getProjectById', id);
     return supabase.from('projects').select('*').eq('id', id).single();
   }
 

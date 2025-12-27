@@ -41,24 +41,17 @@ const App = {
     const loginCard = document.getElementById('login-card');
     const loggedCard = document.getElementById('logged-card');
     const loggedEmail = document.getElementById('logged-email');
-    const projectsSection = document.getElementById('projects-section');
-    const createSection = document.getElementById('create-section');
 
+    // Se estiver fora da página de auth, nada a fazer.
     if (!loginCard || !loggedCard) return;
 
     if (session?.user) {
       loginCard.classList.add('hidden');
       loggedCard.classList.remove('hidden');
       if (loggedEmail) loggedEmail.textContent = session.user.email;
-      projectsSection?.classList.remove('hidden');
-      createSection?.classList.remove('hidden');
-      // Carrega a lista se estivermos na index.
-      App.loadProjects(session.user);
     } else {
       loginCard.classList.remove('hidden');
       loggedCard.classList.add('hidden');
-      projectsSection?.classList.add('hidden');
-      createSection?.classList.add('hidden');
     }
   },
 
@@ -353,7 +346,7 @@ const App = {
   },
 
   /**
-   * Carrega e renderiza os projetos do usuário logado.
+   * Carrega e renderiza os projetos do usuário logado (usado no app.html).
    */
   async loadProjects(user) {
     const grid = document.getElementById('projects-grid');
@@ -366,60 +359,7 @@ const App = {
       grid.innerHTML = '<p class="muted">Não foi possível carregar projetos.</p>';
       return;
     }
-    App.renderProjects(data || []);
-  },
-
-  renderProjects(projects) {
-    const grid = document.getElementById('projects-grid');
-    if (!grid) return;
-    if (!projects.length) {
-      grid.innerHTML = '<p class="muted">Nenhum projeto ainda. Crie o primeiro apartamento.</p>';
-      return;
-    }
-
-    const cards = projects.map((proj) => {
-      const progress = ProjectDomain.placeholderProgress();
-      const period = ProjectDomain.formatPeriod(proj.start_date, proj.end_date);
-      const budget = proj.budget_expected ? `Budget R$ ${proj.budget_expected}` : 'Budget não definido';
-      return `
-        <article class="card project-card">
-          <div class="card-top">
-            <p class="eyebrow">${proj.home_type === 'apartment' ? 'Apartamento' : 'Outro'}</p>
-            <span class="badge outline">${proj.mode || 'macro'}</span>
-          </div>
-          <h3>${proj.name}</h3>
-          <p class="muted">${period}</p>
-          <div class="pill-row">
-            <span class="pill">Progresso ${progress}%</span>
-            <span class="pill outline">${budget}</span>
-          </div>
-          <div class="card-actions">
-            <a class="btn secondary" href="project.html?id=${proj.id}">Abrir</a>
-          </div>
-        </article>`;
-    }).join('');
-
-    // Cards bloqueados “em breve”
-    const lockedCards = `
-      <article class="card project-card muted-card">
-        <div class="card-top">
-          <p class="eyebrow">Em breve</p>
-          <span class="badge outline">Casa</span>
-        </div>
-        <h3>Casa</h3>
-        <p class="muted">Disponível na V2.</p>
-      </article>
-      <article class="card project-card muted-card">
-        <div class="card-top">
-          <p class="eyebrow">Em breve</p>
-          <span class="badge outline">Sítio</span>
-        </div>
-        <h3>Sítio</h3>
-        <p class="muted">Disponível na V2.</p>
-      </article>
-    `;
-
-    grid.innerHTML = cards + lockedCards;
+    ProjectUI.renderProjects(data || [], grid);
   }
 };
 
@@ -452,6 +392,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (submitBtn && !submitBtn.dataset.mode) submitBtn.dataset.mode = 'login';
 
   const isAuthPage = location.pathname.endsWith('index.html') || location.pathname.endsWith('/');
+  const isAppPage = location.pathname.endsWith('app.html');
 
   // Recupera sessão ativa e atualiza header e UI de auth.
   const { session } = await DB.getSession();
@@ -459,7 +400,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   App.updateHeader(App.state.user);
   if (isAuthPage) {
     App.renderAuthUI(session);
-    // Bind criação de projeto somente na home/auth.
+    if (session?.user) App.navigate('app.html');
+  }
+
+  if (isAppPage) {
+    await App.requireAuth();
+    await App.loadProjects(App.state.user);
+
     const createForm = document.getElementById('createProjectForm');
     if (createForm) {
       createForm.addEventListener('submit', async (ev) => {
@@ -474,7 +421,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           return;
         }
         const payload = {
-          user_id: App.state.user.id,
           name: createForm.name.value.trim(),
           home_type: homeType,
           mode: createForm.mode.value,
@@ -491,7 +437,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         App.showToast('Projeto criado.');
         createForm.reset();
-        App.loadProjects(App.state.user);
+        await App.loadProjects(App.state.user);
       });
     }
   }

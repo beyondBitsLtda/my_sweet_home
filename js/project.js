@@ -51,3 +51,78 @@ const ProjectDomain = {
     return `${s} · ${e}`;
   }
 };
+
+/**
+ * Camada de UI para projetos: renderização de listas e detalhes.
+ * Mantemos funções puras e comentadas para facilitar estudos.
+ */
+const ProjectUI = {
+  renderProjects(projects, container) {
+    if (!container) return;
+    if (!projects.length) {
+      container.innerHTML = '<p class="muted">Nenhum projeto ainda. Crie o primeiro apartamento.</p>';
+      return;
+    }
+
+    const cards = projects.map((proj) => {
+      const progress = ProjectDomain.placeholderProgress();
+      const period = ProjectDomain.formatPeriod(proj.start_date, proj.end_date);
+      const budget = proj.budget_expected ? `Budget R$ ${proj.budget_expected}` : 'Budget não definido';
+      return `
+        <article class="card project-card">
+          <div class="card-top">
+            <p class="eyebrow">${proj.home_type === 'apartment' ? 'Apartamento' : 'Outro'}</p>
+            <span class="badge outline">${proj.mode || 'macro'}</span>
+          </div>
+          <h3>${proj.name}</h3>
+          <p class="muted">${period}</p>
+          <div class="pill-row">
+            <span class="pill">Progresso ${progress}%</span>
+            <span class="pill outline">${budget}</span>
+          </div>
+          <div class="card-actions">
+            <a class="btn secondary" href="project.html?id=${proj.id}">Abrir</a>
+          </div>
+        </article>`;
+    }).join('');
+
+    const lockedCards = `
+      <article class="card project-card muted-card">
+        <div class="card-top">
+          <p class="eyebrow">Em breve</p>
+          <span class="badge outline">Casa</span>
+        </div>
+        <h3>Casa</h3>
+        <p class="muted">Disponível na V2.</p>
+      </article>
+      <article class="card project-card muted-card">
+        <div class="card-top">
+          <p class="eyebrow">Em breve</p>
+          <span class="badge outline">Sítio</span>
+        </div>
+        <h3>Sítio</h3>
+        <p class="muted">Disponível na V2.</p>
+      </article>`;
+
+    container.innerHTML = cards + lockedCards;
+  },
+
+  renderProjectDetail(project) {
+    const nameEl = document.getElementById('project-name');
+    const typeEl = document.getElementById('project-type');
+    const periodEl = document.getElementById('project-period');
+    const budgetEl = document.getElementById('project-budget');
+    const metaEl = document.getElementById('project-meta');
+
+    if (!project || !nameEl || !typeEl || !periodEl || !budgetEl || !metaEl) return;
+
+    nameEl.textContent = project.name;
+    typeEl.textContent = `${project.home_type || 'Tipo'} · ${project.mode || 'macro'}`;
+    periodEl.textContent = ProjectDomain.formatPeriod(project.start_date, project.end_date);
+    budgetEl.textContent = project.budget_expected ? `Budget planejado R$ ${project.budget_expected}` : 'Budget não definido';
+    metaEl.innerHTML = `
+      <span class="pill">Progresso ${ProjectDomain.placeholderProgress()}%</span>
+      <span class="pill outline">Budget real ${project.budget_real || 0}</span>
+    `;
+  }
+};
