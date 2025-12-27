@@ -124,17 +124,8 @@ const App = {
     const logoutButton = document.createElement('button');
     logoutButton.className = 'btn ghost';
     logoutButton.type = 'button';
+    logoutButton.dataset.action = 'logout'; // usado na delegação para garantir que sempre funcione
     logoutButton.textContent = 'Sair';
-    // Handler explícito com preventDefault e await para garantir que o logout finalize
-    // antes de redirecionar. Isso evita estados inconsistentes em múltiplas abas.
-    logoutButton.onclick = async (event) => {
-      event.preventDefault();
-      await DB.authSignOut();
-      App.state.user = null;
-      App.updateHeader(null);
-      App.showToast('Você saiu com segurança.');
-      App.navigate('index.html');
-    };
 
     container.append(greeting, logoutButton);
   },
@@ -154,11 +145,7 @@ const App = {
    * - Evita enviar Magic Link por cima de uma sessão ativa.
    */
   async switchAccount() {
-    await DB.authSignOut();
-    App.state.user = null;
-    App.renderAuthUI(null);
-    App.updateHeader(null);
-    App.showToast('Sessão encerrada. Insira o novo email para entrar.');
+    await App.performLogout({ redirect: false, message: 'Sessão encerrada. Insira o novo email para entrar.' });
   },
 
   /**
@@ -167,12 +154,25 @@ const App = {
    */
   async handleLogout(event) {
     event?.preventDefault();
-    await DB.authSignOut();
+    await App.performLogout();
+  },
+
+  /**
+   * performLogout
+   * - Centraliza a saída para evitar duplicação. Usa delegação para funcionar mesmo após re-render de header.
+   */
+  async performLogout({ redirect = true, message = 'Você saiu da sua conta.' } = {}) {
+    const { error } = await DB.authSignOut();
+    if (error) {
+      App.showToast('Não foi possível sair. Tente novamente.');
+      console.error(error);
+      return;
+    }
     App.state.user = null;
     App.updateHeader(null);
-    App.renderAuthUI(null);
-    App.showToast('Você saiu com segurança.');
-    App.navigate('index.html');
+    App.renderAuthUI?.(null);
+    App.showToast(message);
+    if (redirect) App.navigate('index.html');
   },
 
   /**
@@ -389,5 +389,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       App.showToast('Login concluído com sucesso.');
       // Em páginas protegidas, manter navegação; na página de auth mostramos card logado.
     }
+  });
+
+  // Delegação de eventos para logout: funciona mesmo se o header for re-renderizado.
+  document.addEventListener('click', async (event) => {
+    const target = event.target.closest('[data-action="logout"]');
+    if (!target) return;
+    event.preventDefault();
+    await App.performLogout();
   });
 });
