@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Sweet Home — Acessar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+</head>
+<body class="page auth-page">
+  <header class="site-header">
+    <div class="container header-grid">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <span class="brand-name">My Sweet Home</span>
+      </div>
+      <div class="session-actions">
+        <span class="muted">Acesso protegido</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="section auth-hero">
+      <div class="card auth-card" id="login-card">
+        <p class="eyebrow">Acesso</p>
+        <h1>Entre ou crie sua conta</h1>
+        <p class="muted">Usamos Magic Link do Supabase para manter o fluxo seguro e sem senhas. Você receberá um e-mail com o link.</p>
+
+        <div class="tabs auth-tabs" role="tablist">
+          <button class="tab active" data-mode="login" onclick="App.switchAuthTab(event)">Entrar</button>
+          <button class="tab" data-mode="signup" onclick="App.switchAuthTab(event)">Criar conta</button>
+        </div>
+
+        <form id="login-form" class="auth-form">
+          <label class="muted" for="email">E-mail</label>
+          <input class="input" type="email" id="email" name="email" placeholder="voce@exemplo.com" required />
+          <p class="muted small" id="auth-helper">Receba um link seguro para entrar.</p>
+          <button class="btn primary" type="submit">Enviar link</button>
+        </form>
+
+        <div class="info-banner">
+          <p class="label">Como funciona</p>
+          <p class="muted small">Abra o e-mail mais recente e clique no link em poucos minutos. Após validar, você será direcionado ao app.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/app.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/project.js"></script>
+</body>
+</html>
