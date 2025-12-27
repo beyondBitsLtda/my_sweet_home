@@ -32,7 +32,9 @@ const DB = (() => {
     // Calculamos a raiz do site com base na URL atual.
     // Usamos new URL('./', window.location.href) para obter o diretório onde o index.html vive.
     // Isso evita redirecionamentos quebrados em ambientes estáticos (ex.: https://usuario.github.io/repo/).
-    const redirectTo = new URL('./', window.location.href).toString();
+    // Em seguida, definimos explicitamente o arquivo index.html, já que o hash de retorno é processado lá.
+    const baseUrl = new URL('./', window.location.href);
+    const redirectTo = new URL('index.html', baseUrl).toString();
 
     const { error } = await supabase.auth.signInWithOtp({
       email,

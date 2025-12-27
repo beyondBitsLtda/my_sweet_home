@@ -140,7 +140,8 @@ const App = {
       return;
     }
 
-    App.showToast('Enviamos um link mágico para seu e-mail!');
+    // Mensagem mais clara para evitar confusão com múltiplos links antigos.
+    App.showToast('Enviamos um link para seu email. Abra o mais recente e clique nele em até alguns minutos.');
     event.target.reset();
   },
 
@@ -163,6 +164,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const savedTab = App.state.currentTab;
   const defaultTabButton = document.querySelector(`.tab[data-tab="${savedTab}"]`);
   defaultTabButton?.click();
+
+  // Trata erros de retorno de magic link (ex.: otp_expired) logo no carregamento da index.
+  // O Supabase devolve o status no hash (#error=...), por isso fazemos o parse manual.
+  if (location.hash.includes('error_code=otp_expired') || location.hash.includes('error=access_denied')) {
+    App.showToast('Link expirou. Solicite um novo login.');
+    // Limpamos o hash para não reaparecer em navegações futuras.
+    history.replaceState(null, '', location.pathname + location.search);
+  }
 
   // Hook do formulário de login (index).
   const loginForm = document.getElementById('login-form');
