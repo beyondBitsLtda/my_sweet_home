@@ -112,12 +112,15 @@ const App = {
     logoutButton.className = 'btn ghost';
     logoutButton.type = 'button';
     logoutButton.textContent = 'Sair';
-    logoutButton.onclick = async () => {
+    // Handler explícito com preventDefault e await para garantir que o logout finalize
+    // antes de redirecionar. Isso evita estados inconsistentes em múltiplas abas.
+    logoutButton.onclick = async (event) => {
+      event.preventDefault();
       await DB.authSignOut();
       App.state.user = null;
       App.updateHeader(null);
       App.showToast('Você saiu com segurança.');
-      if (!location.pathname.endsWith('index.html')) App.navigate('index.html');
+      App.navigate('index.html');
     };
 
     container.append(greeting, logoutButton);
@@ -146,10 +149,10 @@ const App = {
     const helper = document.getElementById('auth-helper');
     const submit = document.querySelector('#login-form button[type="submit"]');
     if (mode === 'signup') {
-      helper.textContent = 'Você receberá um link no email para confirmar e criar a conta.';
+      helper.textContent = 'Se esse email já estiver cadastrado, você receberá um link para entrar. Se não estiver, o link cria sua conta automaticamente.';
       submit.textContent = 'Criar conta';
     } else {
-      helper.textContent = 'Receba um link seguro para entrar.';
+      helper.textContent = 'Se esse email já estiver cadastrado, você receberá um link para entrar. Se não estiver, o link cria sua conta automaticamente.';
       submit.textContent = 'Enviar link';
     }
   },
@@ -173,8 +176,14 @@ const App = {
       return;
     }
 
-    // Mensagem mais clara para evitar confusão com múltiplos links antigos.
+    // Mensagem clara sobre OTP e cadastro automático.
     App.showToast('Enviamos um link para seu email. Abra o mais recente e clique nele em até alguns minutos.');
+    // Evita múltiplos envios acidentais enquanto o usuário aguarda o e-mail.
+    const submitButton = event.target.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = true;
+      setTimeout(() => { submitButton.disabled = false; }, 4500);
+    }
     event.target.reset();
   },
 
