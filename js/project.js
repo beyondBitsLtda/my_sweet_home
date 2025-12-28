@@ -40,18 +40,46 @@ const ProjectDomain = {
 
 // Mapeamento único de status: garante que UI/back-end usem os mesmos valores aceitos pelo banco.
 // Sempre normalizeStatus antes de gravar no Supabase.
+// Mapeamento único de status: evita violar o CHECK do Postgres.
 const STATUS = {
   todo: 'todo',
-  doing: 'doing',
-  done: 'done',
-  backlog: 'todo', // legado V1
+  'to do': 'todo',
   'to-do': 'todo',
+  'a fazer': 'todo',
+  backlog: 'todo',
+  doing: 'doing',
+  'em andamento': 'doing',
+  fazendo: 'doing',
+  done: 'done',
+  concluido: 'done',
+  concluído: 'done',
+  feito: 'done',
   '': null
 };
 
 function normalizeStatus(raw) {
   const key = (raw || '').toString().trim().toLowerCase();
   return STATUS.hasOwnProperty(key) ? STATUS[key] : null;
+}
+
+// Mapeamento de peso para o CHECK tasks_weight_check.
+const WEIGHT = {
+  light: 'light',
+  leve: 'light',
+  medium: 'medium',
+  medio: 'medium',
+  médio: 'medium',
+  normal: 'medium',
+  heavy: 'heavy',
+  pesado: 'heavy',
+  alta: 'heavy',
+  alto: 'heavy',
+  '': null
+};
+
+function normalizeWeight(raw) {
+  const key = (raw || '').toString().trim().toLowerCase();
+  return WEIGHT.hasOwnProperty(key) ? WEIGHT[key] : null;
 }
 
 /**
@@ -499,7 +527,11 @@ const ProjectPage = {
       });
       return;
     }
-    const { data, error } = await DB.listTasksByProject(projectId, filter);
+    const { data, error } = await DB.listTasksByScope({
+      projectId,
+      scopeType: filter.scope_type,
+      scopeId: filter.scope_id
+    });
     if (error) {
       console.error(error);
       App.showToast('Não foi possível carregar tarefas.');
@@ -507,7 +539,8 @@ const ProjectPage = {
     }
     this.state.tasks = (data || []).map((task) => ({
       ...task,
-      status: normalizeStatus(task.status) || 'todo'
+      status: normalizeStatus(task.status) || 'todo',
+      weight: normalizeWeight(task.weight) || 'medium'
     }));
     ProjectUI.renderKanban(this.state.tasks, {
       ...this.lookups(),
@@ -741,24 +774,27 @@ const ProjectPage = {
       }
 
       const areaId = this.resolveAreaIdForScope();
-      const mappedStatus = normalizeStatus('todo');
-      console.log('mapped status', mappedStatus);
-      if (!mappedStatus) {
-        App.showToast('Status inválido. Tente novamente.');
+      const mappedStatus = normalizeStatus('todo') || 'todo';
+      const mappedWeight = normalizeWeight(form.weight.value) || 'medium';
+      if (!mappedWeight) {
+        App.showToast('Peso inválido. Tente novamente.');
         return;
       }
 
       const payload = {
         project_id: projectId,
-        area_id: areaId,
+        area_id: filter.scope_type === 'area' ? areaId : areaId || null,
         scope_type: filter.scope_type,
         scope_id: filter.scope_id,
         title,
         task_type: form.task_type.value,
         status: mappedStatus,
-        weight: form.weight.value,
+        weight: mappedWeight,
         due_date: form.due_date.value || null,
-        cost_expected: form.cost_expected.value ? Number(form.cost_expected.value) : null
+        cost_expected: form.cost_expected.value ? Number(form.cost_expected.value) : 0,
+        cost_real: 0,
+        has_photo_before: false,
+        has_photo_after: false
       };
       console.log('createTask payload', payload);
       const { data, error } = await DB.createTask(payload);

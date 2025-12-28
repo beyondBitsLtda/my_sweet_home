@@ -5,6 +5,140 @@ const DB = (() => {
   // Guardamos a instância do client em um closure para garantir singleton.
   let client = null;
 
+  // Mapas de normalização para evitar violação de CHECK no Postgres.
+  // Sempre aplicamos trim().toLowerCase() antes de mapear.
+  const STATUS_MAP = {
+    todo: 'todo',
+    'to do': 'todo',
+    'to-do': 'todo',
+    'a fazer': 'todo',
+    backlog: 'todo',
+    doing: 'doing',
+    'em andamento': 'doing',
+    fazendo: 'doing',
+    done: 'done',
+    concluido: 'done',
+    concluído: 'done',
+    feito: 'done'
+  };
+
+  const WEIGHT_MAP = {
+    light: 'light',
+    leve: 'light',
+    medium: 'medium',
+    medio: 'medium',
+    médio: 'medium',
+    normal: 'medium',
+    heavy: 'heavy',
+    pesado: 'heavy',
+    alta: 'heavy',
+    alto: 'heavy'
+  };
+
+  function normalizeStatus(raw) {
+    const key = (raw || '').toString().trim().toLowerCase();
+    return STATUS_MAP[key] || null;
+  }
+
+  function normalizeWeight(raw) {
+    const key = (raw || '').toString().trim().toLowerCase();
+    return WEIGHT_MAP[key] || null;
+  }
+
+  /**
+   * buildTaskPayload
+   * - Centraliza a limpeza/normalização do payload para evitar violações de CHECK.
+   * - Remove campos não permitidos e aplica defaults equivalentes aos do banco.
+   */
+  function buildTaskPayload(task, mode = 'insert') {
+    const allowedKeys = [
+      'project_id',
+      'area_id',
+      'scope_type',
+      'scope_id',
+      'title',
+      'description',
+      'status',
+      'weight',
+      'due_date',
+      'cost_expected',
+      'cost_real',
+      'has_photo_before',
+      'has_photo_after',
+      'task_type'
+    ];
+
+    if (mode === 'insert') {
+      const baseStatus = normalizeStatus(task?.status) || 'todo';
+      const baseWeight = normalizeWeight(task?.weight) || 'medium';
+      const scopeType = (task?.scope_type || 'area').trim();
+      const scopeId = task?.scope_id || (scopeType === 'area' ? task?.area_id : null);
+      if (!scopeId) return { error: new Error('scope_id obrigatório para criar tarefa') };
+      const title = (task?.title || '').trim();
+      if (!title) return { error: new Error('Título obrigatório') };
+
+      const areaId = scopeType === 'area' ? (task?.area_id || scopeId) : task?.area_id || null;
+
+      const cleaned = {
+        project_id: task?.project_id || null,
+        area_id: areaId,
+        scope_type: scopeType,
+        scope_id: scopeId,
+        title,
+        description: task?.description ? task.description.trim() : null,
+        status: baseStatus,
+        weight: baseWeight,
+        due_date: task?.due_date || null,
+        cost_expected: task?.cost_expected ?? 0,
+        cost_real: task?.cost_real ?? 0,
+        has_photo_before: Boolean(task?.has_photo_before),
+        has_photo_after: Boolean(task?.has_photo_after)
+      };
+      if (task?.task_type) cleaned.task_type = task.task_type;
+      return { payload: cleaned };
+    }
+
+    // mode === 'update' => apenas campos presentes, com normalização quando necessário.
+    const patch = {};
+    allowedKeys.forEach((k) => {
+      if (task.hasOwnProperty(k)) {
+        patch[k] = task[k];
+      }
+    });
+
+    if (patch.hasOwnProperty('status')) {
+      const normalized = normalizeStatus(patch.status);
+      if (!normalized) return { error: new Error('Status inválido') };
+      patch.status = normalized;
+    }
+    if (patch.hasOwnProperty('weight')) {
+      const normalizedWeight = normalizeWeight(patch.weight);
+      if (!normalizedWeight) return { error: new Error('Peso inválido') };
+      patch.weight = normalizedWeight;
+    }
+    if (patch.hasOwnProperty('title')) {
+      const title = (patch.title || '').trim();
+      if (!title) return { error: new Error('Título obrigatório') };
+      patch.title = title;
+    }
+    if (patch.hasOwnProperty('description')) {
+      patch.description = patch.description ? patch.description.trim() : null;
+    }
+    if (patch.hasOwnProperty('has_photo_before')) {
+      patch.has_photo_before = Boolean(patch.has_photo_before);
+    }
+    if (patch.hasOwnProperty('has_photo_after')) {
+      patch.has_photo_after = Boolean(patch.has_photo_after);
+    }
+    if (patch.hasOwnProperty('cost_expected')) {
+      patch.cost_expected = patch.cost_expected ?? 0;
+    }
+    if (patch.hasOwnProperty('cost_real')) {
+      patch.cost_real = patch.cost_real ?? 0;
+    }
+    return { payload: patch };
+  }
+
   /**
    * initSupabase
    * - Cria o client apenas uma vez com as credenciais públicas fornecidas.
@@ -196,18 +330,18 @@ const DB = (() => {
   // ---------------------------
   async function createTask(task) {
     const supabase = initSupabase();
-    // Compatibilidade: sempre gravamos scope_type/scope_id.
-    // - area: scope_id = area_id
-    // - sub_area: scope_id = sub_area_id
-    // - corner: scope_id = corner_id
-    const payload = { ...task };
-    if (!payload.scope_type || !payload.scope_id) {
-      console.warn('createTask sem scope explícito, aplicando padrão area');
-      payload.scope_type = 'area';
-      payload.scope_id = task.area_id;
-    }
-    console.info('createTask payload', payload);
-    return supabase.from('tasks').insert(payload).select().single();
+    const { payload, error: buildError } = buildTaskPayload(task, 'insert');
+    if (buildError) return { data: null, error: buildError };
+    console.log('TASK INSERT payload', payload);
+    return supabase.from('tasks').insert([payload]).select('*').single();
+  }
+
+  async function updateTask(taskId, patch) {
+    const supabase = initSupabase();
+    const { payload, error: buildError } = buildTaskPayload(patch, 'update');
+    if (buildError) return { data: null, error: buildError };
+    console.log('TASK UPDATE patch', payload);
+    return supabase.from('tasks').update(payload).eq('id', taskId).select('*').single();
   }
 
   async function listTasksByProject(projectId, filter = {}) {
@@ -228,10 +362,25 @@ const DB = (() => {
     return query;
   }
 
-  async function updateTaskStatus(taskId, status) {
+  async function listTasksByScope({ projectId, scopeType, scopeId }) {
     const supabase = initSupabase();
-    console.info('updateTaskStatus', taskId, status);
-    return supabase.from('tasks').update({ status }).eq('id', taskId).select().single();
+    console.info('listTasksByScope', { projectId, scopeType, scopeId });
+    let query = supabase
+      .from('tasks')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (projectId) query = query.eq('project_id', projectId);
+    if (scopeType) query = query.eq('scope_type', scopeType);
+    if (scopeId) query = query.eq('scope_id', scopeId);
+    return query;
+  }
+
+  async function updateTaskStatus(taskId, status) {
+    // Mantida para compatibilidade; aplica normalização e encaminha para updateTask.
+    const normalized = normalizeStatus(status);
+    if (!normalized) return { data: null, error: new Error('Status inválido') };
+    return updateTask(taskId, { status: normalized });
   }
 
   /**
@@ -311,7 +460,12 @@ const DB = (() => {
     updateCorner,
     deleteCorner,
     createTask,
+    updateTask,
     listTasksByProject,
-    updateTaskStatus
+    listTasksByScope,
+    updateTaskStatus,
+    normalizeStatus,
+    normalizeWeight,
+    buildTaskPayload
   };
 })();
