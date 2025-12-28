@@ -436,10 +436,10 @@ const ProjectUI = {
         const hasPhotos = task.has_photo_before || task.photo_before_url;
         const hasAfter = task.has_photo_after || task.photo_after_url;
         return `
-          <article class="card kanban-card">
-            <div class="card-top">
-              <p class="label">${task.title}</p>
-              <span class="badge outline">${task.task_type || 'tarefa'}</span>
+          <div class="kanban-column">
+            <div class="kanban-header">
+              <span>${st.label}</span>
+              <span class="kanban-counter">${items.length}</span>
             </div>
             <p class="muted">${metadata}</p>
             <div class="pill-row">
