@@ -1268,3 +1268,17 @@ document.addEventListener('submit', async (event) => {
     await ProjectPage.savePhotoFlags();
   }
 });
+
+document.addEventListener('submit', async (event) => {
+  const form = event.target;
+  const action = form?.dataset?.action;
+  if (!action) return;
+  if (action === 'create-sub-area') {
+    event.preventDefault();
+    await ProjectPage.handleCreateSubArea(form);
+  }
+  if (action === 'create-corner') {
+    event.preventDefault();
+    await ProjectPage.handleCreateCorner(form);
+  }
+});
