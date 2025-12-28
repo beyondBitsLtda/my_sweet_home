@@ -38,6 +38,22 @@ const ProjectDomain = {
   }
 };
 
+// Mapeamento único de status: garante que UI/back-end usem os mesmos valores aceitos pelo banco.
+// Sempre normalizeStatus antes de gravar no Supabase.
+const STATUS = {
+  todo: 'todo',
+  doing: 'doing',
+  done: 'done',
+  backlog: 'todo', // legado V1
+  'to-do': 'todo',
+  '': null
+};
+
+function normalizeStatus(raw) {
+  const key = (raw || '').toString().trim().toLowerCase();
+  return STATUS.hasOwnProperty(key) ? STATUS[key] : null;
+}
+
 /**
  * Camada de UI: render de listas/detalhes.
  */
@@ -296,7 +312,7 @@ const ProjectUI = {
     empty.classList.add('hidden');
 
     const statuses = [
-      { key: 'backlog', label: 'Backlog' },
+      { key: 'todo', label: 'Backlog' },
       { key: 'doing', label: 'Fazendo' },
       { key: 'done', label: 'Feito' }
     ];
@@ -489,7 +505,10 @@ const ProjectPage = {
       App.showToast('Não foi possível carregar tarefas.');
       return;
     }
-    this.state.tasks = data || [];
+    this.state.tasks = (data || []).map((task) => ({
+      ...task,
+      status: normalizeStatus(task.status) || 'todo'
+    }));
     ProjectUI.renderKanban(this.state.tasks, {
       ...this.lookups(),
       scopeId: filter.scope_id
@@ -722,6 +741,12 @@ const ProjectPage = {
       }
 
       const areaId = this.resolveAreaIdForScope();
+      const mappedStatus = normalizeStatus('todo');
+      console.log('mapped status', mappedStatus);
+      if (!mappedStatus) {
+        App.showToast('Status inválido. Tente novamente.');
+        return;
+      }
 
       const payload = {
         project_id: projectId,
@@ -730,11 +755,12 @@ const ProjectPage = {
         scope_id: filter.scope_id,
         title,
         task_type: form.task_type.value,
-        status: 'backlog',
+        status: mappedStatus,
         weight: form.weight.value,
         due_date: form.due_date.value || null,
         cost_expected: form.cost_expected.value ? Number(form.cost_expected.value) : null
       };
+      console.log('createTask payload', payload);
       const { data, error } = await DB.createTask(payload);
       if (error) {
         console.error(error);
@@ -855,7 +881,7 @@ const ProjectPage = {
   },
 
   async handleMoveTask(id, direction) {
-    const order = ['backlog', 'doing', 'done'];
+    const order = ['todo', 'doing', 'done'];
     const task = this.state.tasks.find((t) => String(t.id) === String(id));
     if (!task) return;
     const idx = order.indexOf(task.status);
@@ -868,7 +894,14 @@ const ProjectPage = {
       return;
     }
 
-    const { data, error } = await DB.updateTaskStatus(task.id, nextStatus);
+    const mappedStatus = normalizeStatus(nextStatus);
+    console.log('mapped status', mappedStatus);
+    if (!mappedStatus) {
+      App.showToast('Status inválido. Tente novamente.');
+      return;
+    }
+
+    const { data, error } = await DB.updateTaskStatus(task.id, mappedStatus);
     if (error) {
       console.error(error);
       App.showToast('Não foi possível mover a tarefa.');
