@@ -350,8 +350,17 @@ const App = {
    * Carrega e renderiza os projetos do usuário logado (usado no app.html).
    */
   async loadProjects(user) {
+    const appUI = document.querySelector('#appUI') || document.querySelector('[data-app-ui]');
     const grid = document.getElementById('projects-grid');
-    if (!grid || !user) return;
+    if (!appUI || !grid) {
+      console.error('appUI container not found');
+      return;
+    }
+    if (!user) {
+      grid.innerHTML = '<p class="muted">Você precisa estar autenticado.</p>';
+      return;
+    }
+
     grid.innerHTML = '<p class="muted">Carregando projetos...</p>';
 
     const { data, error } = await DB.listProjects(user.id);
@@ -361,7 +370,40 @@ const App = {
       return;
     }
     App.state.projects = data || [];
-    ProjectUI.renderProjects(App.state.projects, grid);
+    App.renderProjects(App.state.projects, grid);
+  },
+
+  renderProjects(projects, container) {
+    if (!container) return;
+    if (!projects.length) {
+      container.innerHTML = '<p class="muted">Nenhum projeto ainda. Crie o primeiro apartamento.</p>';
+      return;
+    }
+    const cards = projects
+      .map((proj) => {
+        const progress = 72;
+        const period = proj.start_date && proj.end_date ? `${proj.start_date} · ${proj.end_date}` : 'Sem datas';
+        const budget = proj.budget_expected ? `Budget R$ ${proj.budget_expected}` : 'Budget não definido';
+        return `
+        <article class="card project-card">
+          <div class="card-top">
+            <p class="eyebrow">${proj.home_type === 'apartment' ? 'Apartamento' : 'Outro'}</p>
+            <span class="badge outline">${proj.mode || 'macro'}</span>
+          </div>
+          <h3>${proj.name}</h3>
+          <p class="muted">${period}</p>
+          <div class="pill-row">
+            <span class="pill">Progresso ${progress}%</span>
+            <span class="pill outline">${budget}</span>
+          </div>
+          <div class="card-actions">
+            <a class="btn secondary" href="project.html?id=${proj.id}">Abrir</a>
+            <button class="btn ghost danger" type="button" data-action="delete-project" data-project-id="${proj.id}">Excluir</button>
+          </div>
+        </article>`;
+      })
+      .join('');
+    container.innerHTML = cards;
   },
 
   /**

@@ -198,6 +198,158 @@ x, y, w, h
 - display_name
 - total_points_lifetime
 
+---
+
+## 8) 🗄️ SQL — Subáreas, Cantos e tarefas com escopo
+
+Use no Supabase (ou psql) para criar as novas entidades mantendo RLS compatível com projects/areas.
+
+```sql
+-- Tabela de subáreas
+create table if not exists public.sub_areas (
+  id uuid primary key default uuid_generate_v4(),
+  area_id uuid not null references public.areas(id) on delete cascade,
+  name text not null,
+  description text,
+  photo_cover_url text,
+  created_at timestamptz default now()
+);
+
+alter table public.sub_areas enable row level security;
+
+create policy "Sub areas visíveis apenas para dono do projeto"
+on public.sub_areas for select
+using (
+  exists (
+    select 1
+    from public.projects p
+    join public.areas a on a.project_id = p.id
+    where a.id = sub_areas.area_id
+      and p.user_id = auth.uid()
+  )
+);
+
+create policy "Sub areas insert apenas dono"
+on public.sub_areas for insert
+with check (
+  exists (
+    select 1
+    from public.projects p
+    join public.areas a on a.project_id = p.id
+    where a.id = sub_areas.area_id
+      and p.user_id = auth.uid()
+  )
+);
+
+create policy "Sub areas update apenas dono"
+on public.sub_areas for update
+using (
+  exists (
+    select 1
+    from public.projects p
+    join public.areas a on a.project_id = p.id
+    where a.id = sub_areas.area_id
+      and p.user_id = auth.uid()
+  )
+);
+
+create policy "Sub areas delete apenas dono"
+on public.sub_areas for delete
+using (
+  exists (
+    select 1
+    from public.projects p
+    join public.areas a on a.project_id = p.id
+    where a.id = sub_areas.area_id
+      and p.user_id = auth.uid()
+  )
+);
+
+-- Tabela de cantos
+create table if not exists public.corners (
+  id uuid primary key default uuid_generate_v4(),
+  sub_area_id uuid not null references public.sub_areas(id) on delete cascade,
+  name text not null,
+  description text,
+  photo_cover_url text,
+  created_at timestamptz default now()
+);
+
+alter table public.corners enable row level security;
+
+create policy "Cantos visíveis apenas para dono do projeto"
+on public.corners for select
+using (
+  exists (
+    select 1
+    from public.projects p
+    join public.areas a on a.project_id = p.id
+    join public.sub_areas sa on sa.area_id = a.id
+    where sa.id = corners.sub_area_id
+      and p.user_id = auth.uid()
+  )
+);
+
+create policy "Cantos insert apenas dono"
+on public.corners for insert
+with check (
+  exists (
+    select 1
+    from public.projects p
+    join public.areas a on a.project_id = p.id
+    join public.sub_areas sa on sa.area_id = a.id
+    where sa.id = corners.sub_area_id
+      and p.user_id = auth.uid()
+  )
+);
+
+create policy "Cantos update apenas dono"
+on public.corners for update
+using (
+  exists (
+    select 1
+    from public.projects p
+    join public.areas a on a.project_id = p.id
+    join public.sub_areas sa on sa.area_id = a.id
+    where sa.id = corners.sub_area_id
+      and p.user_id = auth.uid()
+  )
+);
+
+create policy "Cantos delete apenas dono"
+on public.corners for delete
+using (
+  exists (
+    select 1
+    from public.projects p
+    join public.areas a on a.project_id = p.id
+    join public.sub_areas sa on sa.area_id = a.id
+    where sa.id = corners.sub_area_id
+      and p.user_id = auth.uid()
+  )
+);
+
+-- Ajuste de tarefas para suportar múltiplos níveis de escopo
+alter table public.tasks
+  add column if not exists scope_type text check (scope_type in ('area','sub_area','corner')) default 'area',
+  add column if not exists scope_id uuid;
+
+-- Compatibilidade: tarefas antigas recebem scope_id = area_id.
+update public.tasks
+set scope_type = coalesce(scope_type, 'area'),
+    scope_id = coalesce(scope_id, area_id)
+where scope_id is null;
+
+create index if not exists tasks_scope_idx on public.tasks (scope_type, scope_id);
+
+-- Opcional: manter area_id atualizado ao criar tarefas de subárea/canto (útil para dashboards legados)
+-- update public.tasks t set area_id = sa.area_id
+-- from public.sub_areas sa where t.scope_type = 'sub_area' and t.scope_id = sa.id;
+-- update public.tasks t set area_id = sa.area_id
+-- from public.corners c join public.sub_areas sa on sa.id = c.sub_area_id
+-- where t.scope_type = 'corner' and t.scope_id = c.id;
+```
+
 ### projects
 - id  
 - user_id  
