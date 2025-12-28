@@ -298,6 +298,21 @@ a {
   gap: var(--space-4);
 }
 
+.manage-panel {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.manage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
 .area-card .area-kind {
   display: inline-flex;
   padding: 4px 10px;
@@ -310,6 +325,15 @@ a {
 
 .card-actions .btn.ghost.danger {
   color: var(--color-danger);
+}
+
+.inline-form {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.inline-form .compact-input {
+  background: #fff;
 }
 
 .block-banner {
@@ -334,6 +358,11 @@ a {
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-3);
+}
+
+.pill-row.slim {
+  margin-top: 0;
+  gap: var(--space-1);
 }
 
 .btn {
@@ -368,6 +397,11 @@ a {
   background: none;
   color: var(--color-muted);
   padding: 8px 12px;
+}
+
+.btn.tiny {
+  padding: 6px 10px;
+  font-size: 0.85rem;
 }
 
 .input,
@@ -438,6 +472,34 @@ textarea:focus {
   background: #fdfbf8;
 }
 
+.nested-card {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: var(--space-3);
+  background: #fdfbf8;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.nested-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.corner-panel {
+  border-top: 1px dashed var(--color-border);
+  padding-top: var(--space-2);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.corner-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
 .kanban {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -458,6 +520,43 @@ textarea:focus {
 
 .kanban-card {
   background: linear-gradient(180deg, #ffffff 0%, #f7f2ec 100%);
+}
+
+.kanban-empty-state {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  text-align: center;
+  background: #fdfbf8;
+  margin-top: var(--space-3);
+}
+
+.task-form {
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.task-actions {
+  display: flex;
+  align-items: flex-end;
+}
+
+.scope-filter {
+  min-width: 320px;
+}
+
+.scope-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
 }
 
 .grid.metrics {
@@ -537,6 +636,11 @@ textarea:focus {
   border: 1px solid var(--color-border);
 }
 
+.badge.ghost {
+  background: rgba(47, 42, 37, 0.04);
+  border: 1px solid transparent;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -546,6 +650,11 @@ textarea:focus {
   background: rgba(47, 42, 37, 0.06);
   font-weight: 600;
   font-size: 0.9rem;
+}
+
+.pill.soft {
+  background: rgba(127, 140, 99, 0.1);
+  color: var(--color-text);
 }
 
 .pill.outline { border: 1px solid var(--color-border); background: transparent; }
@@ -612,6 +721,13 @@ textarea:focus {
   gap: var(--space-2);
 }
 
+.soft-card {
+  background: #fdfbf8;
+}
+
+.empty {
+  padding: var(--space-2) 0;
+}
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; }
   .header-grid { grid-template-columns: 1fr; height: auto; padding: var(--space-2) 0; }

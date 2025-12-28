@@ -130,22 +130,102 @@ const DB = (() => {
   }
 
   // ---------------------------
+  // CRUD de subáreas (novidade V1.1)
+  // ---------------------------
+  async function createSubArea(subArea) {
+    const supabase = initSupabase();
+    console.info('createSubArea payload', subArea);
+    return supabase.from('sub_areas').insert(subArea).select().single();
+  }
+
+  async function listSubAreasByArea(areaId) {
+    const supabase = initSupabase();
+    console.info('listSubAreasByArea', areaId);
+    return supabase
+      .from('sub_areas')
+      .select('*')
+      .eq('area_id', areaId)
+      .order('created_at', { ascending: false });
+  }
+
+  async function updateSubArea(subAreaId, patch) {
+    const supabase = initSupabase();
+    console.info('updateSubArea', subAreaId, patch);
+    return supabase.from('sub_areas').update(patch).eq('id', subAreaId).select().single();
+  }
+
+  async function deleteSubArea(subAreaId) {
+    const supabase = initSupabase();
+    console.info('deleteSubArea', subAreaId);
+    return supabase.from('sub_areas').delete().eq('id', subAreaId);
+  }
+
+  // ---------------------------
+  // CRUD de cantos (corners)
+  // ---------------------------
+  async function createCorner(corner) {
+    const supabase = initSupabase();
+    console.info('createCorner payload', corner);
+    return supabase.from('corners').insert(corner).select().single();
+  }
+
+  async function listCornersBySubArea(subAreaId) {
+    const supabase = initSupabase();
+    console.info('listCornersBySubArea', subAreaId);
+    return supabase
+      .from('corners')
+      .select('*')
+      .eq('sub_area_id', subAreaId)
+      .order('created_at', { ascending: false });
+  }
+
+  async function updateCorner(cornerId, patch) {
+    const supabase = initSupabase();
+    console.info('updateCorner', cornerId, patch);
+    return supabase.from('corners').update(patch).eq('id', cornerId).select().single();
+  }
+
+  async function deleteCorner(cornerId) {
+    const supabase = initSupabase();
+    console.info('deleteCorner', cornerId);
+    return supabase.from('corners').delete().eq('id', cornerId);
+  }
+
+  // ---------------------------
   // CRUD de tarefas (V1)
   // ---------------------------
   async function createTask(task) {
     const supabase = initSupabase();
-    console.info('createTask payload', task);
-    return supabase.from('tasks').insert(task).select().single();
+    // Compatibilidade: sempre gravamos scope_type/scope_id.
+    // - area: scope_id = area_id
+    // - sub_area: scope_id = sub_area_id
+    // - corner: scope_id = corner_id
+    const payload = { ...task };
+    if (!payload.scope_type || !payload.scope_id) {
+      console.warn('createTask sem scope explícito, aplicando padrão area');
+      payload.scope_type = 'area';
+      payload.scope_id = task.area_id;
+    }
+    console.info('createTask payload', payload);
+    return supabase.from('tasks').insert(payload).select().single();
   }
 
-  async function listTasksByProject(projectId) {
+  async function listTasksByProject(projectId, filter = {}) {
     const supabase = initSupabase();
-    console.info('listTasksByProject', projectId);
-    return supabase
+    console.info('listTasksByProject', projectId, filter);
+    let query = supabase
       .from('tasks')
       .select('*')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
+
+    if (filter.scope_type) {
+      query = query.eq('scope_type', filter.scope_type);
+    }
+    if (filter.scope_id) {
+      query = query.eq('scope_id', filter.scope_id);
+    }
+    return query;
   }
 
   async function updateTaskStatus(taskId, status) {
@@ -222,6 +302,14 @@ const DB = (() => {
     listAreasByProject,
     updateArea,
     deleteArea,
+    createSubArea,
+    listSubAreasByArea,
+    updateSubArea,
+    deleteSubArea,
+    createCorner,
+    listCornersBySubArea,
+    updateCorner,
+    deleteCorner,
     createTask,
     listTasksByProject,
     updateTaskStatus
