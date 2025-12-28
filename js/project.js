@@ -1052,7 +1052,7 @@ const ProjectPage = {
     this.applyScopeFilter();
     this.updateDashboard();
     this.closePhotoModal();
-    App.showToast('Fotos salvas. Agora você pode concluir a tarefa.');
+    App.showToast('Fotos salvas.');
     if (trigger) trigger.disabled = false;
   },
 
@@ -1305,8 +1305,4 @@ document.addEventListener('submit', async (event) => {
     await ProjectPage.handleCreateCorner(form);
   }
 
-  if (form.id === 'photoForm') {
-    event.preventDefault();
-    await ProjectPage.savePhotoFlags();
-  }
 });
