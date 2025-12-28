@@ -1,5 +1,5 @@
 // Regras de negócio e UI específicas de projetos e áreas (cômodos).
-// Mantemos funções pequenas e comentadas para fins didáticos.
+// Mantemos funções pequenas e comentadas para fins didáticos e logs que ajudam a depurar o fluxo.
 
 const ProjectDomain = {
   // Progresso fictício até termos cálculo real.
@@ -12,6 +12,29 @@ const ProjectDomain = {
     const s = start || '—';
     const e = end || '—';
     return `${s} · ${e}`;
+  },
+  findAreaName(areas, id) {
+    return areas.find((a) => String(a.id) === String(id))?.name || 'Área';
+  },
+  findSubAreaName(subAreas, id) {
+    return subAreas.find((a) => String(a.id) === String(id))?.name || 'Subárea';
+  },
+  findCornerName(corners, id) {
+    return corners.find((c) => String(c.id) === String(id))?.name || 'Canto';
+  },
+  scopeLabel(scope, lookups) {
+    if (!scope) return 'Sem escopo';
+    if (scope.type === 'corner' && scope.cornerId) {
+      const subName = ProjectDomain.findSubAreaName(lookups.subAreas, scope.subAreaId);
+      return `Canto · ${ProjectDomain.findCornerName(lookups.corners, scope.cornerId)} (${subName})`;
+    }
+    if (scope.type === 'sub_area' && scope.subAreaId) {
+      return `Subárea · ${ProjectDomain.findSubAreaName(lookups.subAreas, scope.subAreaId)}`;
+    }
+    if (scope.type === 'area' && scope.areaId) {
+      return `Área · ${ProjectDomain.findAreaName(lookups.areas, scope.areaId)}`;
+    }
+    return 'Selecione um escopo';
   }
 };
 
@@ -25,11 +48,12 @@ const ProjectUI = {
       container.innerHTML = '<p class="muted">Nenhum projeto ainda. Crie o primeiro apartamento.</p>';
       return;
     }
-    const cards = projects.map((proj) => {
-      const progress = ProjectDomain.placeholderProgress();
-      const period = ProjectDomain.formatPeriod(proj.start_date, proj.end_date);
-      const budget = proj.budget_expected ? `Budget R$ ${proj.budget_expected}` : 'Budget não definido';
-      return `
+    const cards = projects
+      .map((proj) => {
+        const progress = ProjectDomain.placeholderProgress();
+        const period = ProjectDomain.formatPeriod(proj.start_date, proj.end_date);
+        const budget = proj.budget_expected ? `Budget R$ ${proj.budget_expected}` : 'Budget não definido';
+        return `
         <article class="card project-card">
           <div class="card-top">
             <p class="eyebrow">${proj.home_type === 'apartment' ? 'Apartamento' : 'Outro'}</p>
@@ -46,7 +70,8 @@ const ProjectUI = {
             <button class="btn ghost danger" type="button" data-action="delete-project" data-project-id="${proj.id}">Excluir</button>
           </div>
         </article>`;
-    }).join('');
+      })
+      .join('');
     const locked = `
       <article class="card project-card muted-card">
         <div class="card-top">
@@ -78,7 +103,9 @@ const ProjectUI = {
     nameEl.textContent = project.name;
     typeEl.textContent = `${project.home_type || 'Tipo'} · ${project.mode || 'macro'}`;
     periodEl.textContent = ProjectDomain.formatPeriod(project.start_date, project.end_date);
-    budgetEl.textContent = project.budget_expected ? `Budget planejado R$ ${project.budget_expected}` : 'Budget não definido';
+    budgetEl.textContent = project.budget_expected
+      ? `Budget planejado R$ ${project.budget_expected}`
+      : 'Budget não definido';
     metaEl.innerHTML = `
       <span class="pill">Progresso ${ProjectDomain.placeholderProgress()}%</span>
       <span class="pill outline">Budget real ${project.budget_real || 0}</span>
@@ -92,19 +119,43 @@ const ProjectUI = {
       grid.innerHTML = '<p class="muted">Nenhum cômodo cadastrado ainda.</p>';
       return;
     }
-    grid.innerHTML = areas.map((area) => `
+    grid.innerHTML = areas
+      .map(
+        (area) => `
       <article class="card area-card" data-area-id="${area.id}">
         <div class="card-top">
-          <p class="label">${area.name}</p>
-          <span class="area-kind">${area.kind}</span>
+          <div>
+            <p class="label">${area.name}</p>
+            <p class="muted">${area.photo_cover_url ? 'Foto adicionada' : 'Sem foto'}</p>
+          </div>
+          <div class="pill-row slim">
+            <span class="pill soft">${area.kind || 'Cômodo'}</span>
+            <button class="btn ghost tiny" type="button" data-action="toggle-area-manage" data-area-id="${area.id}">Gerenciar</button>
+          </div>
         </div>
-        <p class="muted">${area.photo_cover_url ? 'Foto adicionada' : 'Sem foto'}</p>
         <div class="card-actions">
           <button class="btn ghost" type="button" data-action="edit-area" data-area-id="${area.id}">Editar</button>
           <button class="btn ghost danger" type="button" data-action="delete-area" data-area-id="${area.id}">Remover</button>
         </div>
+        <div class="manage-panel hidden" data-area-panel="${area.id}">
+          <div class="manage-header">
+            <div>
+              <p class="label">Subáreas</p>
+              <p class="muted">Divida o cômodo em subpartes e gerencie cantos.</p>
+            </div>
+            <span class="badge outline">Nível 2</span>
+          </div>
+          <div class="subarea-list" data-subarea-list="${area.id}"></div>
+          <form class="inline-form" data-action="create-sub-area" data-area-id="${area.id}">
+            <input class="input compact-input" name="name" placeholder="Nome da subárea" required />
+            <input class="input compact-input" name="description" placeholder="Descrição opcional" />
+            <button class="btn ghost tiny" type="submit">Adicionar subárea</button>
+          </form>
+        </div>
       </article>
-    `).join('');
+    `
+      )
+      .join('');
   },
 
   toggleKanbanBlock(project, areas) {
@@ -118,14 +169,127 @@ const ProjectUI = {
     tab.classList.toggle('muted', shouldBlock);
   },
 
-  renderKanban(tasks, areas, filterAreaId) {
+  renderSubAreas(areaId, subAreas, corners) {
+    const list = document.querySelector(`[data-subarea-list="${areaId}"]`);
+    if (!list) return;
+    const scoped = subAreas.filter((sa) => String(sa.area_id) === String(areaId));
+    if (!scoped.length) {
+      list.innerHTML = `<div class="empty muted">Nenhuma subárea. Comece adicionando uma divisão.</div>`;
+      return;
+    }
+
+    list.innerHTML = scoped
+      .map((sa) => {
+        const cornersForSub = corners.filter((c) => String(c.sub_area_id) === String(sa.id));
+        const cornersList = cornersForSub
+          .map(
+            (c) => `
+              <div class="nested-row">
+                <div>
+                  <p class="label">${c.name}</p>
+                  <p class="muted">${c.description || 'Sem descrição'}</p>
+                </div>
+                <div class="inline-actions">
+                  <span class="badge ghost">Canto</span>
+                  <button class="btn ghost tiny" data-action="edit-corner" data-corner-id="${c.id}">Editar</button>
+                  <button class="btn ghost danger tiny" data-action="delete-corner" data-corner-id="${c.id}">Remover</button>
+                </div>
+              </div>
+            `
+          )
+          .join('');
+
+        return `
+          <article class="nested-card" data-sub-area-id="${sa.id}">
+            <div class="nested-row">
+              <div>
+                <p class="label">${sa.name}</p>
+                <p class="muted">${sa.description || 'Sem descrição'}</p>
+              </div>
+              <div class="inline-actions">
+                <span class="badge ghost">Subárea</span>
+                <button class="btn ghost tiny" data-action="edit-sub-area" data-sub-area-id="${sa.id}">Editar</button>
+                <button class="btn ghost danger tiny" data-action="delete-sub-area" data-sub-area-id="${sa.id}">Remover</button>
+                <button class="btn ghost tiny" data-action="toggle-corners" data-sub-area-id="${sa.id}">Ver cantos</button>
+              </div>
+            </div>
+            <div class="corner-panel hidden" data-corner-panel="${sa.id}">
+              <div class="muted small">Cantos dentro desta subárea</div>
+              <div class="corner-list" data-corner-list="${sa.id}">
+                ${cornersList || '<div class="empty muted">Nenhum canto ainda.</div>'}
+              </div>
+              <form class="inline-form" data-action="create-corner" data-sub-area-id="${sa.id}">
+                <input class="input compact-input" name="name" placeholder="Nome do canto" required />
+                <input class="input compact-input" name="description" placeholder="Descrição opcional" />
+                <button class="btn ghost tiny" type="submit">Adicionar canto</button>
+              </form>
+            </div>
+          </article>
+        `;
+      })
+      .join('');
+  },
+
+  populateScopeSelectors(areas, subAreas, corners, scope) {
+    const typeSel = document.getElementById('scopeTypeSelect');
+    const areaSel = document.getElementById('scopeAreaSelect');
+    const subAreaSel = document.getElementById('scopeSubAreaSelect');
+    const cornerSel = document.getElementById('scopeCornerSelect');
+    if (!typeSel || !areaSel || !subAreaSel || !cornerSel) return;
+
+    typeSel.value = scope.type;
+
+    // Área
+    const areaOptions = ['<option value="">Selecione a área</option>'].concat(
+      areas.map((a) => `<option value="${a.id}">${a.name}</option>`)
+    );
+    areaSel.innerHTML = areaOptions.join('');
+    areaSel.value = scope.areaId || '';
+
+    // Subárea filtrada pela área
+    const subAreaOptions = ['<option value="">Selecione a subárea</option>'].concat(
+      subAreas
+        .filter((sa) => String(sa.area_id) === String(scope.areaId))
+        .map((sa) => `<option value="${sa.id}">${sa.name}</option>`)
+    );
+    subAreaSel.innerHTML = subAreaOptions.join('');
+    subAreaSel.disabled = scope.type === 'area' || !scope.areaId;
+    subAreaSel.value = scope.subAreaId || '';
+
+    // Canto filtrado pela subárea
+    const cornerOptions = ['<option value="">Selecione o canto</option>'].concat(
+      corners
+        .filter((c) => String(c.sub_area_id) === String(scope.subAreaId))
+        .map((c) => `<option value="${c.id}">${c.name}</option>`)
+    );
+    cornerSel.innerHTML = cornerOptions.join('');
+    cornerSel.disabled = scope.type !== 'corner' || !scope.subAreaId;
+    cornerSel.value = scope.cornerId || '';
+  },
+
+  renderScopeSummary(scope, lookups) {
+    const summary = document.getElementById('scopeSummary');
+    if (!summary) return;
+    summary.textContent = ProjectDomain.scopeLabel(scope, lookups);
+  },
+
+  renderKanban(tasks, lookups) {
     const board = document.getElementById('kanban-board');
     const empty = document.getElementById('kanban-empty');
     if (!board || !empty) return;
 
-    const filtered = filterAreaId ? tasks.filter((t) => String(t.scope_id) === String(filterAreaId)) : tasks;
-    if (!filtered.length) {
+    const scopeId = lookups.scopeId;
+
+    if (!scopeId) {
       empty.classList.remove('hidden');
+      empty.querySelector('.empty-text').textContent = 'Selecione um escopo para carregar tarefas.';
+      board.innerHTML = '';
+      return;
+    }
+
+    if (!tasks.length) {
+      empty.classList.remove('hidden');
+      empty.querySelector('.empty-text').textContent = 'Nenhuma tarefa neste escopo ainda.';
       board.innerHTML = '';
       return;
     }
@@ -137,53 +301,62 @@ const ProjectUI = {
       { key: 'done', label: 'Feito' }
     ];
 
-    const areaLabel = (id) => areas.find((a) => String(a.id) === String(id))?.name || 'Área';
+    const cols = statuses
+      .map((st) => {
+        const items = tasks.filter((t) => t.status === st.key);
+        const cards = items
+          .map((task) => {
+            const scopeBadge = (() => {
+              if (task.scope_type === 'corner') {
+                const cornerInfo = lookups.corners.find((c) => String(c.id) === String(task.scope_id));
+                const subName = cornerInfo
+                  ? ProjectDomain.findSubAreaName(lookups.subAreas, cornerInfo.sub_area_id)
+                  : 'Subárea';
+                return `${cornerInfo?.name || ProjectDomain.findCornerName(lookups.corners, task.scope_id)} · ${subName}`;
+              }
+              if (task.scope_type === 'sub_area') {
+                return ProjectDomain.findSubAreaName(lookups.subAreas, task.scope_id);
+              }
+              return ProjectDomain.findAreaName(lookups.areas, task.scope_id);
+            })();
+            const metadata = `${scopeBadge} · peso ${task.weight || 'leve'} · custo ${task.cost_expected || 0}`;
+            return `
+              <article class="card kanban-card">
+                <div class="card-top">
+                  <p class="label">${task.title}</p>
+                  <span class="badge outline">${task.task_type || 'tarefa'}</span>
+                </div>
+                <p class="muted">${metadata}</p>
+                <div class="pill-row">
+                  <span class="pill">Prazo ${task.due_date || '—'}</span>
+                  ${
+                    task.photo_before_url && task.photo_after_url
+                      ? '<span class="pill">Fotos ok</span>'
+                      : '<span class="pill outline">Fotos pendentes</span>'
+                  }
+                </div>
+                <div class="card-actions">
+                  <button class="btn move" type="button" data-action="move-task" data-direction="left" data-task-id="${task.id}">←</button>
+                  <button class="btn move" type="button" data-action="move-task" data-direction="right" data-task-id="${task.id}">→</button>
+                </div>
+              </article>
+            `;
+          })
+          .join('');
 
-    const cols = statuses.map((st) => {
-      const items = filtered.filter((t) => t.status === st.key);
-      const cards = items.map((task) => {
-        const metadata = `${areaLabel(task.scope_id)} · peso ${task.weight || 'leve'} · custo ${task.cost_expected || 0}`;
         return `
-          <article class="card kanban-card">
-            <div class="card-top">
-              <p class="label">${task.title}</p>
-              <span class="badge outline">${task.task_type || 'tarefa'}</span>
+          <div class="kanban-column">
+            <div class="kanban-header">
+              <span>${st.label}</span>
+              <span class="kanban-counter">${items.length}</span>
             </div>
-            <p class="muted">${metadata}</p>
-            <div class="pill-row">
-              <span class="pill">Prazo ${task.due_date || '—'}</span>
-              ${task.photo_before_url && task.photo_after_url ? '<span class="pill">Fotos ok</span>' : '<span class="pill outline">Fotos pendentes</span>'}
-            </div>
-            <div class="card-actions">
-              <button class="btn move" type="button" data-action="move-task" data-direction="left" data-task-id="${task.id}">←</button>
-              <button class="btn move" type="button" data-action="move-task" data-direction="right" data-task-id="${task.id}">→</button>
-            </div>
-          </article>
-        `;
-      }).join('');
-
-      return `
-        <div class="kanban-column">
-          <div class="kanban-header">
-            <span>${st.label}</span>
-            <span class="kanban-counter">${items.length}</span>
+            ${cards || '<div class="kanban-empty">Sem tarefas.</div>'}
           </div>
-          ${cards || '<div class="kanban-empty">Sem tarefas.</div>'}
-        </div>
-      `;
-    }).join('');
+        `;
+      })
+      .join('');
 
     board.innerHTML = cols;
-  },
-
-  populateAreaSelects(areas) {
-    const selects = [document.getElementById('taskArea'), document.getElementById('taskAreaFilter')];
-    selects.forEach((sel) => {
-      if (!sel) return;
-      const options = ['<option value="">Selecione</option>']
-        .concat(areas.map((a) => `<option value="${a.id}">${a.name}</option>`));
-      sel.innerHTML = options.join('');
-    });
   }
 };
 
@@ -194,8 +367,15 @@ const ProjectPage = {
   state: {
     project: null,
     areas: [],
+    subAreas: [],
+    corners: [],
     tasks: [],
-    currentFilterArea: null
+    scopeSelection: {
+      type: 'area',
+      areaId: null,
+      subAreaId: null,
+      cornerId: null
+    }
   },
 
   async init() {
@@ -208,10 +388,12 @@ const ProjectPage = {
     }
     await this.loadProject(projectId);
     await this.loadAreas(projectId);
+    await this.hydrateSubAreasAndCorners();
+    this.bootstrapScope();
     await this.loadTasks(projectId);
     this.bindAreaForm(projectId);
     this.bindTaskForm(projectId);
-    this.bindTaskFilter();
+    this.bindScopeSelectors();
   },
 
   async loadProject(projectId) {
@@ -235,7 +417,83 @@ const ProjectPage = {
     this.state.areas = data || [];
     ProjectUI.renderAreas(this.state.areas);
     ProjectUI.toggleKanbanBlock(this.state.project, this.state.areas);
-    ProjectUI.populateAreaSelects(this.state.areas);
+  },
+
+  async hydrateSubAreasAndCorners() {
+    // Carrega subáreas para cada área e na sequência carrega cantos para cada subárea.
+    const subAreasResults = await Promise.all(
+      this.state.areas.map((area) => DB.listSubAreasByArea(area.id))
+    );
+    subAreasResults.forEach((res) => {
+      if (res.error) console.error('Erro ao carregar subáreas', res.error);
+    });
+    this.state.subAreas = subAreasResults.flatMap((res) => res.data || []);
+
+    const cornerResults = await Promise.all(
+      this.state.subAreas.map((sa) => DB.listCornersBySubArea(sa.id))
+    );
+    cornerResults.forEach((res) => {
+      if (res.error) console.error('Erro ao carregar cantos', res.error);
+    });
+    this.state.corners = cornerResults.flatMap((res) => res.data || []);
+
+    // Renderiza a camada nested.
+    this.state.areas.forEach((area) => {
+      ProjectUI.renderSubAreas(area.id, this.state.subAreas, this.state.corners);
+    });
+  },
+
+  bootstrapScope() {
+    // Seleciona a primeira área disponível por padrão.
+    if (!this.state.scopeSelection.areaId && this.state.areas.length) {
+      this.state.scopeSelection.areaId = this.state.areas[0].id;
+    }
+    ProjectUI.populateScopeSelectors(
+      this.state.areas,
+      this.state.subAreas,
+      this.state.corners,
+      this.state.scopeSelection
+    );
+    ProjectUI.renderScopeSummary(this.state.scopeSelection, this.lookups());
+  },
+
+  lookups() {
+    return {
+      areas: this.state.areas,
+      subAreas: this.state.subAreas,
+      corners: this.state.corners
+    };
+  },
+
+  currentScopeFilter() {
+    const { type, areaId, subAreaId, cornerId } = this.state.scopeSelection;
+    if (type === 'corner' && cornerId) return { scope_type: 'corner', scope_id: cornerId };
+    if (type === 'sub_area' && subAreaId) return { scope_type: 'sub_area', scope_id: subAreaId };
+    if (type === 'area' && areaId) return { scope_type: 'area', scope_id: areaId };
+    return { scope_type: null, scope_id: null };
+  },
+
+  async loadTasks(projectId) {
+    const filter = this.currentScopeFilter();
+    if (!filter.scope_id) {
+      this.state.tasks = [];
+      ProjectUI.renderKanban(this.state.tasks, {
+        ...this.lookups(),
+        scopeId: null
+      });
+      return;
+    }
+    const { data, error } = await DB.listTasksByProject(projectId, filter);
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível carregar tarefas.');
+      return;
+    }
+    this.state.tasks = data || [];
+    ProjectUI.renderKanban(this.state.tasks, {
+      ...this.lookups(),
+      scopeId: filter.scope_id
+    });
   },
 
   bindAreaForm(projectId) {
@@ -266,7 +524,14 @@ const ProjectPage = {
       form.reset();
       this.state.areas.unshift(data);
       ProjectUI.renderAreas(this.state.areas);
+      await this.hydrateSubAreasAndCorners();
       ProjectUI.toggleKanbanBlock(this.state.project, this.state.areas);
+
+      // Ajusta escopo default para o novo cômodo se nenhum estava selecionado.
+      if (!this.state.scopeSelection.areaId) {
+        this.state.scopeSelection.areaId = data.id;
+        this.syncScopeUI();
+      }
     });
   },
 
@@ -282,8 +547,15 @@ const ProjectPage = {
       return;
     }
     this.state.areas = this.state.areas.filter((a) => String(a.id) !== String(id));
+    this.state.subAreas = this.state.subAreas.filter((sa) => String(sa.area_id) !== String(id));
+    this.state.corners = this.state.corners.filter((c) =>
+      this.state.subAreas.some((sa) => String(sa.id) === String(c.sub_area_id))
+    );
     ProjectUI.renderAreas(this.state.areas);
+    this.state.areas.forEach((area) => ProjectUI.renderSubAreas(area.id, this.state.subAreas, this.state.corners));
     ProjectUI.toggleKanbanBlock(this.state.project, this.state.areas);
+    this.resetScopeIfInvalid();
+    await this.loadTasks(this.state.project.id);
     App.showToast('Cômodo removido.');
   },
 
@@ -300,8 +572,136 @@ const ProjectPage = {
     }
     this.state.areas = this.state.areas.map((a) => (String(a.id) === String(id) ? data : a));
     ProjectUI.renderAreas(this.state.areas);
+    this.state.areas.forEach((areaItem) =>
+      ProjectUI.renderSubAreas(areaItem.id, this.state.subAreas, this.state.corners)
+    );
+    this.syncScopeUI();
     App.showToast('Cômodo atualizado.');
-    ProjectUI.populateAreaSelects(this.state.areas);
+  },
+
+  async handleCreateSubArea(form) {
+    const areaId = form.dataset.areaId;
+    const name = form.name.value.trim();
+    if (!name) {
+      App.showToast('Informe um nome para a subárea.');
+      return;
+    }
+    const { data, error } = await DB.createSubArea({
+      area_id: areaId,
+      name,
+      description: form.description.value.trim() || null
+    });
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível criar a subárea.');
+      return;
+    }
+    form.reset();
+    this.state.subAreas.unshift(data);
+    ProjectUI.renderSubAreas(areaId, this.state.subAreas, this.state.corners);
+    this.syncScopeUI();
+    App.showToast('Subárea adicionada.');
+  },
+
+  async handleEditSubArea(id) {
+    const subArea = this.state.subAreas.find((sa) => String(sa.id) === String(id));
+    if (!subArea) return;
+    const newName = window.prompt('Editar subárea', subArea.name);
+    if (!newName) return;
+    const { data, error } = await DB.updateSubArea(id, { name: newName });
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível atualizar a subárea.');
+      return;
+    }
+    this.state.subAreas = this.state.subAreas.map((sa) => (String(sa.id) === String(id) ? data : sa));
+    ProjectUI.renderSubAreas(subArea.area_id, this.state.subAreas, this.state.corners);
+    this.syncScopeUI();
+    App.showToast('Subárea atualizada.');
+  },
+
+  async handleDeleteSubArea(id) {
+    const subArea = this.state.subAreas.find((sa) => String(sa.id) === String(id));
+    if (!subArea) return;
+    const confirmed = window.confirm('Remover subárea e seus cantos?');
+    if (!confirmed) return;
+    const { error } = await DB.deleteSubArea(id);
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível remover a subárea.');
+      return;
+    }
+    this.state.subAreas = this.state.subAreas.filter((sa) => String(sa.id) !== String(id));
+    this.state.corners = this.state.corners.filter((c) => String(c.sub_area_id) !== String(id));
+    ProjectUI.renderSubAreas(subArea.area_id, this.state.subAreas, this.state.corners);
+    this.resetScopeIfInvalid();
+    await this.loadTasks(this.state.project.id);
+    this.syncScopeUI();
+    App.showToast('Subárea removida.');
+  },
+
+  async handleCreateCorner(form) {
+    const subAreaId = form.dataset.subAreaId;
+    const name = form.name.value.trim();
+    if (!name) {
+      App.showToast('Informe um nome para o canto.');
+      return;
+    }
+    const { data, error } = await DB.createCorner({
+      sub_area_id: subAreaId,
+      name,
+      description: form.description.value.trim() || null
+    });
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível criar o canto.');
+      return;
+    }
+    form.reset();
+    this.state.corners.unshift(data);
+    ProjectUI.renderSubAreas(this.findAreaIdBySubArea(subAreaId), this.state.subAreas, this.state.corners);
+    this.syncScopeUI();
+    App.showToast('Canto adicionado.');
+  },
+
+  async handleEditCorner(id) {
+    const corner = this.state.corners.find((c) => String(c.id) === String(id));
+    if (!corner) return;
+    const newName = window.prompt('Editar canto', corner.name);
+    if (!newName) return;
+    const { data, error } = await DB.updateCorner(id, { name: newName });
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível atualizar o canto.');
+      return;
+    }
+    this.state.corners = this.state.corners.map((c) => (String(c.id) === String(id) ? data : c));
+    ProjectUI.renderSubAreas(this.findAreaIdBySubArea(corner.sub_area_id), this.state.subAreas, this.state.corners);
+    this.syncScopeUI();
+    App.showToast('Canto atualizado.');
+  },
+
+  async handleDeleteCorner(id) {
+    const corner = this.state.corners.find((c) => String(c.id) === String(id));
+    if (!corner) return;
+    const confirmed = window.confirm('Remover canto?');
+    if (!confirmed) return;
+    const { error } = await DB.deleteCorner(id);
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível remover o canto.');
+      return;
+    }
+    this.state.corners = this.state.corners.filter((c) => String(c.id) !== String(id));
+    ProjectUI.renderSubAreas(this.findAreaIdBySubArea(corner.sub_area_id), this.state.subAreas, this.state.corners);
+    this.resetScopeIfInvalid();
+    await this.loadTasks(this.state.project.id);
+    this.syncScopeUI();
+    App.showToast('Canto removido.');
+  },
+
+  findAreaIdBySubArea(subAreaId) {
+    return this.state.subAreas.find((sa) => String(sa.id) === String(subAreaId))?.area_id;
   },
 
   bindTaskForm(projectId) {
@@ -310,15 +710,24 @@ const ProjectPage = {
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
       const title = form.title.value.trim();
-      const areaId = form.area.value;
-      if (!title || !areaId) {
-        App.showToast('Preencha título e selecione o cômodo.');
+      if (!title) {
+        App.showToast('Preencha o título da tarefa.');
         return;
       }
+
+      const filter = this.currentScopeFilter();
+      if (!filter.scope_type || !filter.scope_id) {
+        App.showToast('Escolha um escopo antes de criar tarefas.');
+        return;
+      }
+
+      const areaId = this.resolveAreaIdForScope();
+
       const payload = {
         project_id: projectId,
-        scope_type: 'area',
-        scope_id: areaId,
+        area_id: areaId,
+        scope_type: filter.scope_type,
+        scope_id: filter.scope_id,
         title,
         task_type: form.task_type.value,
         status: 'backlog',
@@ -335,28 +744,114 @@ const ProjectPage = {
       App.showToast('Tarefa criada.');
       form.reset();
       this.state.tasks.unshift(data);
-      ProjectUI.renderKanban(this.state.tasks, this.state.areas, this.currentFilterArea);
+      ProjectUI.renderKanban(this.state.tasks, {
+        ...this.lookups(),
+        scopeId: filter.scope_id
+      });
     });
   },
 
-  bindTaskFilter() {
-    const filter = document.getElementById('taskAreaFilter');
-    if (!filter) return;
-    filter.addEventListener('change', () => {
-      this.currentFilterArea = filter.value || null;
-      ProjectUI.renderKanban(this.state.tasks, this.state.areas, this.currentFilterArea);
-    });
-  },
-
-  async loadTasks(projectId) {
-    const { data, error } = await DB.listTasksByProject(projectId);
-    if (error) {
-      console.error(error);
-      App.showToast('Não foi possível carregar tarefas.');
-      return;
+  resolveAreaIdForScope() {
+    const { type, areaId, subAreaId, cornerId } = this.state.scopeSelection;
+    if (type === 'area') return areaId;
+    if (type === 'sub_area') {
+      return this.findAreaIdBySubArea(subAreaId);
     }
-    this.state.tasks = data || [];
-    ProjectUI.renderKanban(this.state.tasks, this.state.areas, this.currentFilterArea);
+    if (type === 'corner') {
+      const cornerInfo = this.state.corners.find((c) => String(c.id) === String(cornerId));
+      const parentSubAreaId = cornerInfo?.sub_area_id || subAreaId;
+      const subArea = this.state.subAreas.find((sa) => String(sa.id) === String(parentSubAreaId));
+      return subArea?.area_id || this.findAreaIdBySubArea(parentSubAreaId) || areaId;
+    }
+    return areaId;
+  },
+
+  bindScopeSelectors() {
+    const typeSel = document.getElementById('scopeTypeSelect');
+    const areaSel = document.getElementById('scopeAreaSelect');
+    const subAreaSel = document.getElementById('scopeSubAreaSelect');
+    const cornerSel = document.getElementById('scopeCornerSelect');
+    if (!typeSel || !areaSel || !subAreaSel || !cornerSel) return;
+
+    const syncAndLoad = async () => {
+      this.syncScopeFromUI();
+      await this.loadTasks(this.state.project.id);
+    };
+
+    typeSel.addEventListener('change', syncAndLoad);
+    areaSel.addEventListener('change', syncAndLoad);
+    subAreaSel.addEventListener('change', syncAndLoad);
+    cornerSel.addEventListener('change', syncAndLoad);
+  },
+
+  syncScopeFromUI() {
+    const typeSel = document.getElementById('scopeTypeSelect');
+    const areaSel = document.getElementById('scopeAreaSelect');
+    const subAreaSel = document.getElementById('scopeSubAreaSelect');
+    const cornerSel = document.getElementById('scopeCornerSelect');
+    const type = typeSel?.value || 'area';
+
+    const nextScope = {
+      type,
+      areaId: areaSel?.value || this.state.areas[0]?.id || null,
+      subAreaId: subAreaSel?.value || null,
+      cornerId: cornerSel?.value || null
+    };
+
+    // Quando mudamos o tipo, limpamos descendentes inválidos para evitar seleções quebradas.
+    if (nextScope.type === 'area') {
+      nextScope.subAreaId = null;
+      nextScope.cornerId = null;
+    }
+    if (nextScope.type === 'sub_area') {
+      nextScope.cornerId = null;
+      // se não escolher subárea, sugere a primeira disponível
+      if (!nextScope.subAreaId) {
+        const first = this.state.subAreas.find((sa) => String(sa.area_id) === String(nextScope.areaId));
+        nextScope.subAreaId = first?.id || null;
+      }
+    }
+    if (nextScope.type === 'corner') {
+      if (!nextScope.subAreaId) {
+        const first = this.state.subAreas.find((sa) => String(sa.area_id) === String(nextScope.areaId));
+        nextScope.subAreaId = first?.id || null;
+      }
+      if (!nextScope.cornerId && nextScope.subAreaId) {
+        const firstCorner = this.state.corners.find(
+          (c) => String(c.sub_area_id) === String(nextScope.subAreaId)
+        );
+        nextScope.cornerId = firstCorner?.id || null;
+      }
+    }
+
+    this.state.scopeSelection = nextScope;
+    this.syncScopeUI();
+  },
+
+  syncScopeUI() {
+    ProjectUI.populateScopeSelectors(
+      this.state.areas,
+      this.state.subAreas,
+      this.state.corners,
+      this.state.scopeSelection
+    );
+    ProjectUI.renderScopeSummary(this.state.scopeSelection, this.lookups());
+  },
+
+  resetScopeIfInvalid() {
+    const { type, areaId, subAreaId, cornerId } = this.state.scopeSelection;
+    if (type === 'area' && !this.state.areas.some((a) => String(a.id) === String(areaId))) {
+      this.state.scopeSelection.areaId = this.state.areas[0]?.id || null;
+    }
+    if (type === 'sub_area' && !this.state.subAreas.some((sa) => String(sa.id) === String(subAreaId))) {
+      this.state.scopeSelection.subAreaId = null;
+      this.state.scopeSelection.type = 'area';
+    }
+    if (type === 'corner' && !this.state.corners.some((c) => String(c.id) === String(cornerId))) {
+      this.state.scopeSelection.cornerId = null;
+      this.state.scopeSelection.type = this.state.scopeSelection.subAreaId ? 'sub_area' : 'area';
+    }
+    this.syncScopeUI();
   },
 
   async handleMoveTask(id, direction) {
@@ -380,11 +875,14 @@ const ProjectPage = {
       return;
     }
     this.state.tasks = this.state.tasks.map((t) => (String(t.id) === String(id) ? data : t));
-    ProjectUI.renderKanban(this.state.tasks, this.state.areas, this.currentFilterArea);
+    ProjectUI.renderKanban(this.state.tasks, {
+      ...this.lookups(),
+      scopeId: this.currentScopeFilter().scope_id
+    });
   }
 };
 
-// Delegação específica da página de projeto (áreas e tarefas)
+// Delegação específica da página de projeto (áreas, subáreas, cantos e tarefas)
 document.addEventListener('click', async (event) => {
   const delAreaBtn = event.target.closest('[data-action="delete-area"]');
   if (delAreaBtn) {
@@ -393,17 +891,77 @@ document.addEventListener('click', async (event) => {
     await ProjectPage.handleDeleteArea(id, delAreaBtn);
     return;
   }
+
   const editAreaBtn = event.target.closest('[data-action="edit-area"]');
   if (editAreaBtn) {
     event.preventDefault();
     const id = editAreaBtn.dataset.areaId;
     await ProjectPage.handleEditArea(id);
+    return;
   }
+
+  const togglePanelBtn = event.target.closest('[data-action="toggle-area-manage"]');
+  if (togglePanelBtn) {
+    const areaId = togglePanelBtn.dataset.areaId;
+    const panel = document.querySelector(`[data-area-panel="${areaId}"]`);
+    panel?.classList.toggle('hidden');
+    return;
+  }
+
+  const editSubAreaBtn = event.target.closest('[data-action="edit-sub-area"]');
+  if (editSubAreaBtn) {
+    event.preventDefault();
+    await ProjectPage.handleEditSubArea(editSubAreaBtn.dataset.subAreaId);
+    return;
+  }
+
+  const deleteSubAreaBtn = event.target.closest('[data-action="delete-sub-area"]');
+  if (deleteSubAreaBtn) {
+    event.preventDefault();
+    await ProjectPage.handleDeleteSubArea(deleteSubAreaBtn.dataset.subAreaId);
+    return;
+  }
+
+  const toggleCornersBtn = event.target.closest('[data-action="toggle-corners"]');
+  if (toggleCornersBtn) {
+    const panel = document.querySelector(`[data-corner-panel="${toggleCornersBtn.dataset.subAreaId}"]`);
+    panel?.classList.toggle('hidden');
+    return;
+  }
+
+  const editCornerBtn = event.target.closest('[data-action="edit-corner"]');
+  if (editCornerBtn) {
+    event.preventDefault();
+    await ProjectPage.handleEditCorner(editCornerBtn.dataset.cornerId);
+    return;
+  }
+
+  const deleteCornerBtn = event.target.closest('[data-action="delete-corner"]');
+  if (deleteCornerBtn) {
+    event.preventDefault();
+    await ProjectPage.handleDeleteCorner(deleteCornerBtn.dataset.cornerId);
+    return;
+  }
+
   const moveBtn = event.target.closest('[data-action="move-task"]');
   if (moveBtn) {
     event.preventDefault();
     const id = moveBtn.dataset.taskId;
     const dir = moveBtn.dataset.direction;
     await ProjectPage.handleMoveTask(id, dir);
+  }
+});
+
+document.addEventListener('submit', async (event) => {
+  const form = event.target;
+  const action = form?.dataset?.action;
+  if (!action) return;
+  if (action === 'create-sub-area') {
+    event.preventDefault();
+    await ProjectPage.handleCreateSubArea(form);
+  }
+  if (action === 'create-corner') {
+    event.preventDefault();
+    await ProjectPage.handleCreateCorner(form);
   }
 });
