@@ -45,11 +45,61 @@
 
       <div class="tabs" role="tablist">
         <button class="tab active" data-tab="structure" onclick="App.switchTab(event)">Estrutura</button>
-        <button class="tab" data-tab="kanban" onclick="App.switchTab(event)">Kanban</button>
+        <button class="tab" data-tab="kanban" onclick="App.switchTab(event)" id="kanban-tab">Kanban</button>
         <button class="tab" data-tab="dashboard" onclick="App.switchTab(event)">Dashboard</button>
       </div>
 
       <section id="tab-structure" class="tab-panel">
+        <div id="kanban-block" class="block-banner hidden">
+          <div>
+            <p class="label">Kanban bloqueado</p>
+            <p class="muted">Modo macro exige pelo menos 2 cômodos para liberar o Kanban.</p>
+          </div>
+          <button class="btn secondary" type="button" onclick="document.getElementById('areaForm')?.scrollIntoView({ behavior: 'smooth' })">Adicionar cômodo</button>
+        </div>
+
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Cômodos</p>
+            <h3>Estrutura do apartamento</h3>
+            <p class="muted">Vitrine clean com cards de cômodos e ações discretas.</p>
+          </div>
+        </div>
+
+        <div class="area-grid" id="areas-grid">
+          <!-- cards de áreas via JS -->
+        </div>
+
+        <div class="card" id="area-form-card">
+          <p class="eyebrow">Criar cômodo</p>
+          <h3>Novo cômodo</h3>
+          <form class="auth-form" id="areaForm">
+            <label class="muted" for="areaName">Nome</label>
+            <input class="input" id="areaName" name="name" placeholder="Sala de estar" required />
+
+            <label class="muted" for="areaKind">Tipo</label>
+            <select class="input" id="areaKind" name="kind" required>
+              <option value="">Selecione</option>
+              <option>Sala</option>
+              <option>Cozinha</option>
+              <option>Quarto</option>
+              <option>Banheiro</option>
+              <option>Lavanderia</option>
+              <option>Varanda</option>
+              <option>Escritório</option>
+              <option>Hall</option>
+              <option>Closet</option>
+              <option>Área de Serviço</option>
+              <option>Outro</option>
+            </select>
+
+            <label class="muted" for="areaPhoto">Foto (opcional)</label>
+            <input class="input" id="areaPhoto" name="photo_cover_url" placeholder="URL da foto (opcional)" />
+
+            <button class="btn primary" type="submit">Adicionar cômodo</button>
+          </form>
+        </div>
+
         <div class="card">
           <div class="card-header">
             <div>
@@ -198,37 +248,7 @@
   <script src="js/project.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
-      const params = new URLSearchParams(window.location.search);
-      const projectId = params.get('id');
-      const nameEl = document.getElementById('project-name');
-      const typeEl = document.getElementById('project-type');
-      const periodEl = document.getElementById('project-period');
-      const budgetEl = document.getElementById('project-budget');
-      const metaEl = document.getElementById('project-meta');
-
-      if (!projectId) {
-        nameEl.textContent = 'Projeto não encontrado';
-        periodEl.textContent = 'Sem ID na URL';
-        return;
-      }
-
-      await App.requireAuth();
-      const { data, error } = await DB.getProjectById(projectId);
-      if (error || !data) {
-        nameEl.textContent = 'Projeto não encontrado';
-        periodEl.textContent = 'Verifique se o ID está correto';
-        console.error(error);
-        return;
-      }
-
-      nameEl.textContent = data.name;
-      typeEl.textContent = `${data.home_type || 'Tipo'} · ${data.mode || 'macro'}`;
-      periodEl.textContent = ProjectDomain.formatPeriod(data.start_date, data.end_date);
-      budgetEl.textContent = data.budget_expected ? `Budget planejado R$ ${data.budget_expected}` : 'Budget não definido';
-      metaEl.innerHTML = `
-        <span class="pill">Progresso ${ProjectDomain.placeholderProgress()}%</span>
-        <span class="pill outline">Budget real ${data.budget_real || 0}</span>
-      `;
+      await ProjectPage.init();
     });
   </script>
 </body>

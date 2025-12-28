@@ -92,6 +92,43 @@ const DB = (() => {
     return supabase.from('projects').select('*').eq('id', id).single();
   }
 
+  // ---------------------------
+  // CRUD de áreas (cômodos) — V1
+  // ---------------------------
+
+  async function createArea(area) {
+    const supabase = initSupabase();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) return { data: null, error: new Error('Usuário não autenticado') };
+
+    // RLS protege, mas explicitamos o project_id enviado pelo front.
+    console.info('createArea payload', area);
+    return supabase.from('areas').insert(area).select().single();
+  }
+
+  async function listAreasByProject(projectId) {
+    const supabase = initSupabase();
+    console.info('listAreasByProject', projectId);
+    return supabase
+      .from('areas')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+  }
+
+  async function updateArea(areaId, patch) {
+    const supabase = initSupabase();
+    console.info('updateArea', areaId, patch);
+    return supabase.from('areas').update(patch).eq('id', areaId).select().single();
+  }
+
+  async function deleteArea(areaId) {
+    const supabase = initSupabase();
+    console.info('deleteArea', areaId);
+    return supabase.from('areas').delete().eq('id', areaId);
+  }
+
   /**
    * deleteProject
    * - Exclui um projeto pertencente ao usuário logado.
@@ -155,6 +192,10 @@ const DB = (() => {
     createProject,
     listProjects,
     getProjectById,
-    deleteProject
+    deleteProject,
+    createArea,
+    listAreasByProject,
+    updateArea,
+    deleteArea
   };
 })();

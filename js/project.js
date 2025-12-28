@@ -1,49 +1,12 @@
-// Regras de negócio e cálculos do domínio.
-// Este arquivo apenas descreve o formato e deixa espaço para a implementação futura.
+// Regras de negócio e UI específicas de projetos e áreas (cômodos).
+// Mantemos funções pequenas e comentadas para fins didáticos.
 
 const ProjectDomain = {
-  /**
-   * Calcula o progresso com base na soma dos pesos concluídos.
-   * Mantemos um retorno fixo para fins de mock visual.
-   */
-  calculateProgress(tasks = []) {
-    console.info('calculateProgress stub', tasks);
-    return 72; // valor simbólico usado em todas as páginas para consistência visual.
-  },
-
-  /**
-   * Calcula pontos gamificados.
-   */
-  calculatePoints(tasks = []) {
-    console.info('calculatePoints stub', tasks);
-    return 480; // mantém o mesmo valor usado nos cards de exemplo.
-  },
-
-  /**
-   * Avalia tarefas atrasadas.
-   */
-  detectLateTasks(tasks = []) {
-    console.info('detectLateTasks stub', tasks);
-    return 2; // número fictício para exibir badges de alerta.
-  },
-
-  /**
-   * Gera dados mock para o Kanban e dashboard.
-   */
-  getMockTasks() {
-    return [
-      { title: 'Comprar tapete', status: 'backlog', weight: 'leve' },
-      { title: 'Instalar iluminação', status: 'doing', weight: 'médio' },
-      { title: 'Marcenaria home office', status: 'done', weight: 'pesado' }
-    ];
-  },
-
-  // Progresso placeholder para cards enquanto não calculamos de verdade.
+  // Progresso fictício até termos cálculo real.
   placeholderProgress() {
     return 72;
   },
-
-  // Formata período.
+  // Formata período amigável.
   formatPeriod(start, end) {
     if (!start && !end) return 'Sem datas';
     const s = start || '—';
@@ -53,8 +16,7 @@ const ProjectDomain = {
 };
 
 /**
- * Camada de UI para projetos: renderização de listas e detalhes.
- * Mantemos funções puras e comentadas para facilitar estudos.
+ * Camada de UI: render de listas/detalhes.
  */
 const ProjectUI = {
   renderProjects(projects, container) {
@@ -63,7 +25,6 @@ const ProjectUI = {
       container.innerHTML = '<p class="muted">Nenhum projeto ainda. Crie o primeiro apartamento.</p>';
       return;
     }
-
     const cards = projects.map((proj) => {
       const progress = ProjectDomain.placeholderProgress();
       const period = ProjectDomain.formatPeriod(proj.start_date, proj.end_date);
@@ -86,8 +47,7 @@ const ProjectUI = {
           </div>
         </article>`;
     }).join('');
-
-    const lockedCards = `
+    const locked = `
       <article class="card project-card muted-card">
         <div class="card-top">
           <p class="eyebrow">Em breve</p>
@@ -104,8 +64,7 @@ const ProjectUI = {
         <h3>Sítio</h3>
         <p class="muted">Disponível na V2.</p>
       </article>`;
-
-    container.innerHTML = cards + lockedCards;
+    container.innerHTML = cards + locked;
   },
 
   renderProjectDetail(project) {
@@ -114,7 +73,6 @@ const ProjectUI = {
     const periodEl = document.getElementById('project-period');
     const budgetEl = document.getElementById('project-budget');
     const metaEl = document.getElementById('project-meta');
-
     if (!project || !nameEl || !typeEl || !periodEl || !budgetEl || !metaEl) return;
 
     nameEl.textContent = project.name;
@@ -125,5 +83,166 @@ const ProjectUI = {
       <span class="pill">Progresso ${ProjectDomain.placeholderProgress()}%</span>
       <span class="pill outline">Budget real ${project.budget_real || 0}</span>
     `;
+  },
+
+  renderAreas(areas) {
+    const grid = document.getElementById('areas-grid');
+    if (!grid) return;
+    if (!areas.length) {
+      grid.innerHTML = '<p class="muted">Nenhum cômodo cadastrado ainda.</p>';
+      return;
+    }
+    grid.innerHTML = areas.map((area) => `
+      <article class="card area-card" data-area-id="${area.id}">
+        <div class="card-top">
+          <p class="label">${area.name}</p>
+          <span class="area-kind">${area.kind}</span>
+        </div>
+        <p class="muted">${area.photo_cover_url ? 'Foto adicionada' : 'Sem foto'}</p>
+        <div class="card-actions">
+          <button class="btn ghost" type="button" data-action="edit-area" data-area-id="${area.id}">Editar</button>
+          <button class="btn ghost danger" type="button" data-action="delete-area" data-area-id="${area.id}">Remover</button>
+        </div>
+      </article>
+    `).join('');
+  },
+
+  toggleKanbanBlock(project, areas) {
+    const block = document.getElementById('kanban-block');
+    const tab = document.getElementById('kanban-tab');
+    if (!block || !tab) return;
+
+    const shouldBlock = project?.mode === 'macro' && areas.length < 2;
+    block.classList.toggle('hidden', !shouldBlock);
+    tab.disabled = shouldBlock;
+    tab.classList.toggle('muted', shouldBlock);
   }
 };
+
+/**
+ * Fluxos específicos da página de projeto (detalhe).
+ */
+const ProjectPage = {
+  state: {
+    project: null,
+    areas: []
+  },
+
+  async init() {
+    await App.requireAuth();
+    const params = new URLSearchParams(window.location.search);
+    const projectId = params.get('id');
+    if (!projectId) {
+      App.showToast('Projeto não encontrado.');
+      return;
+    }
+    await this.loadProject(projectId);
+    await this.loadAreas(projectId);
+    this.bindAreaForm(projectId);
+  },
+
+  async loadProject(projectId) {
+    const { data, error } = await DB.getProjectById(projectId);
+    if (error || !data) {
+      console.error(error);
+      App.showToast('Projeto não encontrado.');
+      return;
+    }
+    this.state.project = data;
+    ProjectUI.renderProjectDetail(data);
+  },
+
+  async loadAreas(projectId) {
+    const { data, error } = await DB.listAreasByProject(projectId);
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível carregar cômodos.');
+      return;
+    }
+    this.state.areas = data || [];
+    ProjectUI.renderAreas(this.state.areas);
+    ProjectUI.toggleKanbanBlock(this.state.project, this.state.areas);
+  },
+
+  bindAreaForm(projectId) {
+    const form = document.getElementById('areaForm');
+    if (!form) return;
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const name = form.name.value.trim();
+      const kind = form.kind.value.trim();
+      const photo = form.photo_cover_url.value.trim();
+      if (!name || !kind) {
+        App.showToast('Preencha nome e tipo.');
+        return;
+      }
+      const payload = {
+        project_id: projectId,
+        name,
+        kind,
+        photo_cover_url: photo || null
+      };
+      const { data, error } = await DB.createArea(payload);
+      if (error) {
+        console.error(error);
+        App.showToast('Não foi possível criar o cômodo.');
+        return;
+      }
+      App.showToast('Cômodo criado.');
+      form.reset();
+      this.state.areas.unshift(data);
+      ProjectUI.renderAreas(this.state.areas);
+      ProjectUI.toggleKanbanBlock(this.state.project, this.state.areas);
+    });
+  },
+
+  async handleDeleteArea(id, trigger) {
+    const confirmed = window.confirm('Excluir cômodo?\n\nEssa ação não pode ser desfeita.');
+    if (!confirmed) return;
+    if (trigger) trigger.disabled = true;
+    const { error } = await DB.deleteArea(id);
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível excluir o cômodo.');
+      if (trigger) trigger.disabled = false;
+      return;
+    }
+    this.state.areas = this.state.areas.filter((a) => String(a.id) !== String(id));
+    ProjectUI.renderAreas(this.state.areas);
+    ProjectUI.toggleKanbanBlock(this.state.project, this.state.areas);
+    App.showToast('Cômodo removido.');
+  },
+
+  async handleEditArea(id) {
+    const area = this.state.areas.find((a) => String(a.id) === String(id));
+    if (!area) return;
+    const newName = window.prompt('Editar nome do cômodo', area.name);
+    if (!newName) return;
+    const { data, error } = await DB.updateArea(id, { name: newName });
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível atualizar o cômodo.');
+      return;
+    }
+    this.state.areas = this.state.areas.map((a) => (String(a.id) === String(id) ? data : a));
+    ProjectUI.renderAreas(this.state.areas);
+    App.showToast('Cômodo atualizado.');
+  }
+};
+
+// Delegação específica da página de projeto (áreas)
+document.addEventListener('click', async (event) => {
+  const delAreaBtn = event.target.closest('[data-action="delete-area"]');
+  if (delAreaBtn) {
+    event.preventDefault();
+    const id = delAreaBtn.dataset.areaId;
+    await ProjectPage.handleDeleteArea(id, delAreaBtn);
+    return;
+  }
+  const editAreaBtn = event.target.closest('[data-action="edit-area"]');
+  if (editAreaBtn) {
+    event.preventDefault();
+    const id = editAreaBtn.dataset.areaId;
+    await ProjectPage.handleEditArea(id);
+  }
+});
