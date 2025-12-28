@@ -129,6 +129,31 @@ const DB = (() => {
     return supabase.from('areas').delete().eq('id', areaId);
   }
 
+  // ---------------------------
+  // CRUD de tarefas (V1)
+  // ---------------------------
+  async function createTask(task) {
+    const supabase = initSupabase();
+    console.info('createTask payload', task);
+    return supabase.from('tasks').insert(task).select().single();
+  }
+
+  async function listTasksByProject(projectId) {
+    const supabase = initSupabase();
+    console.info('listTasksByProject', projectId);
+    return supabase
+      .from('tasks')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+  }
+
+  async function updateTaskStatus(taskId, status) {
+    const supabase = initSupabase();
+    console.info('updateTaskStatus', taskId, status);
+    return supabase.from('tasks').update({ status }).eq('id', taskId).select().single();
+  }
+
   /**
    * deleteProject
    * - Exclui um projeto pertencente ao usuário logado.
@@ -196,6 +221,9 @@ const DB = (() => {
     createArea,
     listAreasByProject,
     updateArea,
-    deleteArea
+    deleteArea,
+    createTask,
+    listTasksByProject,
+    updateTaskStatus
   };
 })();

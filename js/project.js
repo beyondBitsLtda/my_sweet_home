@@ -116,6 +116,74 @@ const ProjectUI = {
     block.classList.toggle('hidden', !shouldBlock);
     tab.disabled = shouldBlock;
     tab.classList.toggle('muted', shouldBlock);
+  },
+
+  renderKanban(tasks, areas, filterAreaId) {
+    const board = document.getElementById('kanban-board');
+    const empty = document.getElementById('kanban-empty');
+    if (!board || !empty) return;
+
+    const filtered = filterAreaId ? tasks.filter((t) => String(t.scope_id) === String(filterAreaId)) : tasks;
+    if (!filtered.length) {
+      empty.classList.remove('hidden');
+      board.innerHTML = '';
+      return;
+    }
+    empty.classList.add('hidden');
+
+    const statuses = [
+      { key: 'backlog', label: 'Backlog' },
+      { key: 'doing', label: 'Fazendo' },
+      { key: 'done', label: 'Feito' }
+    ];
+
+    const areaLabel = (id) => areas.find((a) => String(a.id) === String(id))?.name || 'Área';
+
+    const cols = statuses.map((st) => {
+      const items = filtered.filter((t) => t.status === st.key);
+      const cards = items.map((task) => {
+        const metadata = `${areaLabel(task.scope_id)} · peso ${task.weight || 'leve'} · custo ${task.cost_expected || 0}`;
+        return `
+          <article class="card kanban-card">
+            <div class="card-top">
+              <p class="label">${task.title}</p>
+              <span class="badge outline">${task.task_type || 'tarefa'}</span>
+            </div>
+            <p class="muted">${metadata}</p>
+            <div class="pill-row">
+              <span class="pill">Prazo ${task.due_date || '—'}</span>
+              ${task.photo_before_url && task.photo_after_url ? '<span class="pill">Fotos ok</span>' : '<span class="pill outline">Fotos pendentes</span>'}
+            </div>
+            <div class="card-actions">
+              <button class="btn move" type="button" data-action="move-task" data-direction="left" data-task-id="${task.id}">←</button>
+              <button class="btn move" type="button" data-action="move-task" data-direction="right" data-task-id="${task.id}">→</button>
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      return `
+        <div class="kanban-column">
+          <div class="kanban-header">
+            <span>${st.label}</span>
+            <span class="kanban-counter">${items.length}</span>
+          </div>
+          ${cards || '<div class="kanban-empty">Sem tarefas.</div>'}
+        </div>
+      `;
+    }).join('');
+
+    board.innerHTML = cols;
+  },
+
+  populateAreaSelects(areas) {
+    const selects = [document.getElementById('taskArea'), document.getElementById('taskAreaFilter')];
+    selects.forEach((sel) => {
+      if (!sel) return;
+      const options = ['<option value="">Selecione</option>']
+        .concat(areas.map((a) => `<option value="${a.id}">${a.name}</option>`));
+      sel.innerHTML = options.join('');
+    });
   }
 };
 
@@ -125,7 +193,9 @@ const ProjectUI = {
 const ProjectPage = {
   state: {
     project: null,
-    areas: []
+    areas: [],
+    tasks: [],
+    currentFilterArea: null
   },
 
   async init() {
@@ -138,7 +208,10 @@ const ProjectPage = {
     }
     await this.loadProject(projectId);
     await this.loadAreas(projectId);
+    await this.loadTasks(projectId);
     this.bindAreaForm(projectId);
+    this.bindTaskForm(projectId);
+    this.bindTaskFilter();
   },
 
   async loadProject(projectId) {
@@ -162,6 +235,7 @@ const ProjectPage = {
     this.state.areas = data || [];
     ProjectUI.renderAreas(this.state.areas);
     ProjectUI.toggleKanbanBlock(this.state.project, this.state.areas);
+    ProjectUI.populateAreaSelects(this.state.areas);
   },
 
   bindAreaForm(projectId) {
@@ -227,10 +301,90 @@ const ProjectPage = {
     this.state.areas = this.state.areas.map((a) => (String(a.id) === String(id) ? data : a));
     ProjectUI.renderAreas(this.state.areas);
     App.showToast('Cômodo atualizado.');
+    ProjectUI.populateAreaSelects(this.state.areas);
+  },
+
+  bindTaskForm(projectId) {
+    const form = document.getElementById('taskForm');
+    if (!form) return;
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const title = form.title.value.trim();
+      const areaId = form.area.value;
+      if (!title || !areaId) {
+        App.showToast('Preencha título e selecione o cômodo.');
+        return;
+      }
+      const payload = {
+        project_id: projectId,
+        scope_type: 'area',
+        scope_id: areaId,
+        title,
+        task_type: form.task_type.value,
+        status: 'backlog',
+        weight: form.weight.value,
+        due_date: form.due_date.value || null,
+        cost_expected: form.cost_expected.value ? Number(form.cost_expected.value) : null
+      };
+      const { data, error } = await DB.createTask(payload);
+      if (error) {
+        console.error(error);
+        App.showToast('Não foi possível criar a tarefa.');
+        return;
+      }
+      App.showToast('Tarefa criada.');
+      form.reset();
+      this.state.tasks.unshift(data);
+      ProjectUI.renderKanban(this.state.tasks, this.state.areas, this.currentFilterArea);
+    });
+  },
+
+  bindTaskFilter() {
+    const filter = document.getElementById('taskAreaFilter');
+    if (!filter) return;
+    filter.addEventListener('change', () => {
+      this.currentFilterArea = filter.value || null;
+      ProjectUI.renderKanban(this.state.tasks, this.state.areas, this.currentFilterArea);
+    });
+  },
+
+  async loadTasks(projectId) {
+    const { data, error } = await DB.listTasksByProject(projectId);
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível carregar tarefas.');
+      return;
+    }
+    this.state.tasks = data || [];
+    ProjectUI.renderKanban(this.state.tasks, this.state.areas, this.currentFilterArea);
+  },
+
+  async handleMoveTask(id, direction) {
+    const order = ['backlog', 'doing', 'done'];
+    const task = this.state.tasks.find((t) => String(t.id) === String(id));
+    if (!task) return;
+    const idx = order.indexOf(task.status);
+    const nextIdx = direction === 'left' ? idx - 1 : idx + 1;
+    if (nextIdx < 0 || nextIdx >= order.length) return;
+    const nextStatus = order[nextIdx];
+
+    if (nextStatus === 'done' && !(task.photo_before_url && task.photo_after_url)) {
+      App.showToast('Adicione fotos antes/depois antes de concluir.');
+      return;
+    }
+
+    const { data, error } = await DB.updateTaskStatus(task.id, nextStatus);
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível mover a tarefa.');
+      return;
+    }
+    this.state.tasks = this.state.tasks.map((t) => (String(t.id) === String(id) ? data : t));
+    ProjectUI.renderKanban(this.state.tasks, this.state.areas, this.currentFilterArea);
   }
 };
 
-// Delegação específica da página de projeto (áreas)
+// Delegação específica da página de projeto (áreas e tarefas)
 document.addEventListener('click', async (event) => {
   const delAreaBtn = event.target.closest('[data-action="delete-area"]');
   if (delAreaBtn) {
@@ -244,5 +398,12 @@ document.addEventListener('click', async (event) => {
     event.preventDefault();
     const id = editAreaBtn.dataset.areaId;
     await ProjectPage.handleEditArea(id);
+  }
+  const moveBtn = event.target.closest('[data-action="move-task"]');
+  if (moveBtn) {
+    event.preventDefault();
+    const id = moveBtn.dataset.taskId;
+    const dir = moveBtn.dataset.direction;
+    await ProjectPage.handleMoveTask(id, dir);
   }
 });
