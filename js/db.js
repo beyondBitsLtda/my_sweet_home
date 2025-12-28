@@ -413,10 +413,11 @@ const DB = (() => {
   async function updateTaskPhotos(taskId, { has_photo_before, has_photo_after }) {
     const supabase = initSupabase();
     console.log('TASK UPDATE photos', { taskId, has_photo_before, has_photo_after });
-    return updateTask(taskId, {
+    const payload = {
       has_photo_before: Boolean(has_photo_before),
       has_photo_after: Boolean(has_photo_after)
-    });
+    };
+    return supabase.from('tasks').update(payload).eq('id', taskId).select('*').single();
   }
 
   /**

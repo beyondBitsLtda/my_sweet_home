@@ -478,6 +478,7 @@ const ProjectUI = {
  */
 const ProjectPage = {
   state: {
+    projectId: null,
     project: null,
     projectTasks: [],
     areas: [],
@@ -500,6 +501,7 @@ const ProjectPage = {
   async init() {
     await App.requireAuth();
     const projectId = new URLSearchParams(window.location.search).get('id');
+    this.state.projectId = projectId;
     const projectUI = document.querySelector('#projectUI') || document.querySelector('[data-project-ui]');
     if (!projectUI) {
       console.error('Container do projeto não encontrado (#projectUI).');
@@ -1007,11 +1009,13 @@ const ProjectPage = {
     this.state.photoModal.afterPreview = null;
   },
 
-  async savePhotoFlags() {
+  async savePhotoFlags(trigger) {
     const taskId = this.state.photoModal.taskId;
     if (!taskId) return;
+    if (trigger) trigger.disabled = true;
     const task = this.state.projectTasks.find((t) => String(t.id) === String(taskId));
     if (!task) {
+      if (trigger) trigger.disabled = false;
       this.closePhotoModal();
       return;
     }
@@ -1030,6 +1034,7 @@ const ProjectPage = {
     if (error) {
       console.error(error);
       App.showToast('Não foi possível atualizar fotos.');
+      if (trigger) trigger.disabled = false;
       return;
     }
 
@@ -1047,7 +1052,8 @@ const ProjectPage = {
     this.applyScopeFilter();
     this.updateDashboard();
     this.closePhotoModal();
-    App.showToast('Fotos marcadas.');
+    App.showToast('Fotos salvas. Agora você pode concluir a tarefa.');
+    if (trigger) trigger.disabled = false;
   },
 
   bindScopeSelectors() {
@@ -1276,6 +1282,13 @@ document.addEventListener('click', async (event) => {
   if (photosBtn) {
     event.preventDefault();
     ProjectPage.openPhotoModal(photosBtn.dataset.taskId);
+    return;
+  }
+
+  const savePhotosBtn = event.target.closest('[data-action="save-photos"]');
+  if (savePhotosBtn) {
+    event.preventDefault();
+    await ProjectPage.savePhotoFlags(savePhotosBtn);
   }
 });
 

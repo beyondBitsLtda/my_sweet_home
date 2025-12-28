@@ -205,6 +205,23 @@
         <button class="btn ghost" type="button" onclick="ProjectPage.closePhotoModal()">Fechar</button>
       </div>
       <p class="muted small">Registre fotos de Antes/Depois para liberar o Done. Nesta V1 não enviamos para o Storage; marcamos apenas os flags.</p>
+      <div id="photoForm" class="photo-form">
+        <div class="photo-input">
+          <label class="muted">Foto Antes</label>
+          <input type="file" accept="image/*" id="photoBefore" />
+          <img id="photoBeforePreview" class="photo-preview hidden" alt="Preview antes" />
+        </div>
+        <div class="photo-input">
+          <label class="muted">Foto Depois</label>
+          <input type="file" accept="image/*" id="photoAfter" />
+          <img id="photoAfterPreview" class="photo-preview hidden" alt="Preview depois" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn secondary" type="button" onclick="ProjectPage.closePhotoModal()">Cancelar</button>
+          <button class="btn primary" type="button" data-action="save-photos">Salvar</button>
+        </div>
+      </div>
+      <p class="muted small">Registre fotos de Antes/Depois para liberar o Done. Nesta V1 não enviamos para o Storage; marcamos apenas os flags.</p>
       <form id="photoForm" class="photo-form">
         <div class="photo-input">
           <label class="muted">Foto Antes</label>
