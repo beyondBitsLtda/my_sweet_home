@@ -988,8 +988,10 @@ const ProjectPage = {
     this.state.photoModal.taskId = taskId;
     this.state.photoModal.beforePreview = null;
     this.state.photoModal.afterPreview = null;
-    document.getElementById('photoBefore')?.value = '';
-    document.getElementById('photoAfter')?.value = '';
+    const beforeInput = document.getElementById('photoBefore');
+    const afterInput = document.getElementById('photoAfter');
+    if (beforeInput) beforeInput.value = '';
+    if (afterInput) afterInput.value = '';
     const beforeImg = document.getElementById('photoBeforePreview');
     const afterImg = document.getElementById('photoAfterPreview');
     if (beforeImg) beforeImg.classList.add('hidden');
