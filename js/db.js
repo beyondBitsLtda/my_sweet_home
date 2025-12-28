@@ -410,6 +410,15 @@ const DB = (() => {
     return { data, error };
   }
 
+  async function updateTaskPhotos(taskId, { has_photo_before, has_photo_after }) {
+    const supabase = initSupabase();
+    console.log('TASK UPDATE photos', { taskId, has_photo_before, has_photo_after });
+    return updateTask(taskId, {
+      has_photo_before: Boolean(has_photo_before),
+      has_photo_after: Boolean(has_photo_after)
+    });
+  }
+
   /**
    * deleteProject
    * - Exclui um projeto pertencente ao usuário logado.
@@ -492,6 +501,7 @@ const DB = (() => {
     listTasksByScope,
     updateTaskStatus,
     updateUserLifetimePoints,
+    updateTaskPhotos,
     normalizeStatus,
     normalizeWeight,
     buildTaskPayload

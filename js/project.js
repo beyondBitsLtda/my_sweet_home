@@ -428,28 +428,30 @@ const ProjectUI = {
                 return `${cornerInfo?.name || ProjectDomain.findCornerName(lookups.corners, task.scope_id)} · ${subName}`;
               }
               if (task.scope_type === 'sub_area') {
-            return ProjectDomain.findSubAreaName(lookups.subAreas, task.scope_id);
-          }
-          return ProjectDomain.findAreaName(lookups.areas, task.scope_id);
-        })();
-        const metadata = `${scopeBadge} · peso ${task.weight || 'leve'} · custo ${task.cost_expected || 0}`;
+                return ProjectDomain.findSubAreaName(lookups.subAreas, task.scope_id);
+              }
+              return ProjectDomain.findAreaName(lookups.areas, task.scope_id);
+            })();
+            const metadata = `${scopeBadge} · peso ${task.weight || 'leve'} · custo ${task.cost_expected || 0}`;
         const hasPhotos = task.has_photo_before || task.photo_before_url;
         const hasAfter = task.has_photo_after || task.photo_after_url;
-        return `
-          <div class="kanban-column">
-            <div class="kanban-header">
-              <span>${st.label}</span>
-              <span class="kanban-counter">${items.length}</span>
-            </div>
-            <p class="muted">${metadata}</p>
-            <div class="pill-row">
-              <span class="pill">Prazo ${task.due_date || '—'}</span>
-              ${hasPhotos && hasAfter ? '<span class="pill">Fotos ok</span>' : '<span class="pill outline">Fotos pendentes</span>'}
-            </div>
-            <div class="card-actions">
-              <button class="btn move" type="button" data-action="move-task" data-direction="left" data-task-id="${task.id}">←</button>
-              <button class="btn move" type="button" data-action="move-task" data-direction="right" data-task-id="${task.id}">→</button>
-            </div>
+            return `
+              <article class="card kanban-card">
+                <div class="card-top">
+                  <p class="label">${task.title}</p>
+                  <span class="badge outline">${task.task_type || 'tarefa'}</span>
+                </div>
+                <p class="muted">${metadata}</p>
+                <div class="pill-row">
+                  <span class="pill">Prazo ${task.due_date || '—'}</span>
+                  <span class="pill ${hasPhotos ? '' : 'outline'}">Antes ${hasPhotos ? '✓' : '✗'}</span>
+                  <span class="pill ${hasAfter ? '' : 'outline'}">Depois ${hasAfter ? '✓' : '✗'}</span>
+                </div>
+                <div class="card-actions">
+                  <button class="btn ghost tiny" type="button" data-action="open-photos" data-task-id="${task.id}">Fotos</button>
+                  <button class="btn move" type="button" data-action="move-task" data-direction="left" data-task-id="${task.id}">←</button>
+                  <button class="btn move" type="button" data-action="move-task" data-direction="right" data-task-id="${task.id}">→</button>
+                </div>
               </article>
             `;
           })
@@ -487,6 +489,11 @@ const ProjectPage = {
       areaId: null,
       subAreaId: null,
       cornerId: null
+    },
+    photoModal: {
+      taskId: null,
+      beforePreview: null,
+      afterPreview: null
     }
   },
 
@@ -948,6 +955,72 @@ const ProjectPage = {
     return areaId;
   },
 
+  openPhotoModal(taskId) {
+    const modal = document.getElementById('photo-modal');
+    if (!modal) return;
+    this.state.photoModal.taskId = taskId;
+    this.state.photoModal.beforePreview = null;
+    this.state.photoModal.afterPreview = null;
+    document.getElementById('photoBefore')?.value = '';
+    document.getElementById('photoAfter')?.value = '';
+    const beforeImg = document.getElementById('photoBeforePreview');
+    const afterImg = document.getElementById('photoAfterPreview');
+    if (beforeImg) beforeImg.classList.add('hidden');
+    if (afterImg) afterImg.classList.add('hidden');
+    modal.classList.remove('hidden');
+  },
+
+  closePhotoModal() {
+    const modal = document.getElementById('photo-modal');
+    if (modal) modal.classList.add('hidden');
+    this.state.photoModal.taskId = null;
+    this.state.photoModal.beforePreview = null;
+    this.state.photoModal.afterPreview = null;
+  },
+
+  async savePhotoFlags() {
+    const taskId = this.state.photoModal.taskId;
+    if (!taskId) return;
+    const task = this.state.projectTasks.find((t) => String(t.id) === String(taskId));
+    if (!task) {
+      this.closePhotoModal();
+      return;
+    }
+
+    const beforeFile = document.getElementById('photoBefore')?.files?.[0] || null;
+    const afterFile = document.getElementById('photoAfter')?.files?.[0] || null;
+
+    // V1: se o usuário escolheu arquivo, marcamos o booleano como true. Sem upload para storage.
+    const hasBefore = Boolean(beforeFile) || Boolean(task.has_photo_before);
+    const hasAfter = Boolean(afterFile) || Boolean(task.has_photo_after);
+
+    const { data, error } = await DB.updateTaskPhotos(taskId, {
+      has_photo_before: hasBefore,
+      has_photo_after: hasAfter
+    });
+    if (error) {
+      console.error(error);
+      App.showToast('Não foi possível atualizar fotos.');
+      return;
+    }
+
+    const normalized = {
+      ...task,
+      ...data,
+      has_photo_before: hasBefore,
+      has_photo_after: hasAfter,
+      status: normalizeStatus(data.status || task.status) || 'todo',
+      weight: normalizeWeight(data.weight || task.weight) || 'medium'
+    };
+    this.state.projectTasks = this.state.projectTasks.map((t) =>
+      String(t.id) === String(taskId) ? normalized : t
+    );
+    this.applyScopeFilter();
+    this.updateDashboard();
+    this.closePhotoModal();
+    App.showToast('Fotos marcadas.');
+  },
+
   bindScopeSelectors() {
     const typeSel = document.getElementById('scopeTypeSelect');
     const areaSel = document.getElementById('scopeAreaSelect');
@@ -1168,6 +1241,31 @@ document.addEventListener('click', async (event) => {
     const id = moveBtn.dataset.taskId;
     const dir = moveBtn.dataset.direction;
     await ProjectPage.handleMoveTask(id, dir);
+  }
+
+  const photosBtn = event.target.closest('[data-action="open-photos"]');
+  if (photosBtn) {
+    event.preventDefault();
+    ProjectPage.openPhotoModal(photosBtn.dataset.taskId);
+  }
+});
+
+document.addEventListener('submit', async (event) => {
+  const form = event.target;
+  const action = form?.dataset?.action;
+  if (!action) return;
+  if (action === 'create-sub-area') {
+    event.preventDefault();
+    await ProjectPage.handleCreateSubArea(form);
+  }
+  if (action === 'create-corner') {
+    event.preventDefault();
+    await ProjectPage.handleCreateCorner(form);
+  }
+
+  if (form.id === 'photoForm') {
+    event.preventDefault();
+    await ProjectPage.savePhotoFlags();
   }
 });
 

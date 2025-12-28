@@ -198,18 +198,29 @@
   </main>
 
   <div id="toast" class="toast hidden"></div>
-  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="photo-modal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>Editar tarefa</h3>
-        <button class="btn ghost" type="button" onclick="App.hideModal()">Fechar</button>
+        <h3>Fotos da tarefa</h3>
+        <button class="btn ghost" type="button" onclick="ProjectPage.closePhotoModal()">Fechar</button>
       </div>
-      <label class="muted">Título</label>
-      <input class="input" type="text" placeholder="Ex.: Instalar iluminação" />
-      <div class="modal-actions">
-        <button class="btn primary" type="button">Salvar</button>
-        <button class="btn secondary" type="button" onclick="App.hideModal()">Cancelar</button>
-      </div>
+      <p class="muted small">Registre fotos de Antes/Depois para liberar o Done. Nesta V1 não enviamos para o Storage; marcamos apenas os flags.</p>
+      <form id="photoForm" class="photo-form">
+        <div class="photo-input">
+          <label class="muted">Foto Antes</label>
+          <input type="file" accept="image/*" id="photoBefore" />
+          <img id="photoBeforePreview" class="photo-preview hidden" alt="Preview antes" />
+        </div>
+        <div class="photo-input">
+          <label class="muted">Foto Depois</label>
+          <input type="file" accept="image/*" id="photoAfter" />
+          <img id="photoAfterPreview" class="photo-preview hidden" alt="Preview depois" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn secondary" type="button" onclick="ProjectPage.closePhotoModal()">Cancelar</button>
+          <button class="btn primary" type="submit">Salvar</button>
+        </div>
+      </form>
     </div>
   </div>
 
