@@ -499,13 +499,40 @@ const ProjectPage = {
 
   async init() {
     await App.requireAuth();
-    const params = new URLSearchParams(window.location.search);
-    const projectId = params.get('id');
-    if (!projectId) {
-      App.showToast('Projeto não encontrado.');
+    const projectId = new URLSearchParams(window.location.search).get('id');
+    const projectUI = document.querySelector('#projectUI') || document.querySelector('[data-project-ui]');
+    if (!projectUI) {
+      console.error('Container do projeto não encontrado (#projectUI).');
       return;
     }
-    await this.loadProject(projectId);
+
+    if (!projectId) {
+      projectUI.innerHTML = `
+        <div class="card">
+          <p class="eyebrow">Projeto inválido</p>
+          <h3>Projeto inválido ou link incompleto</h3>
+          <p class="muted">Reabra a partir da lista de projetos.</p>
+          <a class="btn primary" href="app.html">Voltar para projetos</a>
+        </div>`;
+      return;
+    }
+
+    const { data: project, error } = await DB.getProjectById(projectId);
+    if (error || !project) {
+      console.error('Erro ao carregar projeto', error);
+      projectUI.innerHTML = `
+        <div class="card">
+          <p class="eyebrow">Erro</p>
+          <h3>Não foi possível carregar o projeto</h3>
+          <p class="muted">Tente novamente ou volte para projetos.</p>
+          <a class="btn primary" href="app.html">Voltar para projetos</a>
+        </div>`;
+      return;
+    }
+
+    this.state.project = project;
+    ProjectUI.renderProjectDetail(project);
+
     await this.loadAreas(projectId);
     await this.hydrateSubAreasAndCorners();
     this.bootstrapScope();
@@ -1266,19 +1293,5 @@ document.addEventListener('submit', async (event) => {
   if (form.id === 'photoForm') {
     event.preventDefault();
     await ProjectPage.savePhotoFlags();
-  }
-});
-
-document.addEventListener('submit', async (event) => {
-  const form = event.target;
-  const action = form?.dataset?.action;
-  if (!action) return;
-  if (action === 'create-sub-area') {
-    event.preventDefault();
-    await ProjectPage.handleCreateSubArea(form);
-  }
-  if (action === 'create-corner') {
-    event.preventDefault();
-    await ProjectPage.handleCreateCorner(form);
   }
 });
