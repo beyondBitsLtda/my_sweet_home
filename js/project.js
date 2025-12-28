@@ -82,6 +82,75 @@ function normalizeWeight(raw) {
   return WEIGHT.hasOwnProperty(key) ? WEIGHT[key] : null;
 }
 
+function getWeightValue(raw) {
+  const normalized = normalizeWeight(raw) || 'medium';
+  if (normalized === 'light') return 1;
+  if (normalized === 'heavy') return 3;
+  return 2; // medium default
+}
+
+function computeProjectProgress(tasks) {
+  const normalized = (tasks || []).map((t) => ({
+    status: normalizeStatus(t.status) || 'todo',
+    weight: getWeightValue(t.weight)
+  }));
+  const W = normalized.reduce((sum, t) => sum + t.weight, 0);
+  if (!W) return { W: 0, progressPercent: 0 };
+  const doneWeight = normalized
+    .filter((t) => t.status === 'done')
+    .reduce((sum, t) => sum + t.weight, 0);
+  const progressPercent = Number(((doneWeight / W) * 100).toFixed(1));
+  return { W, progressPercent };
+}
+
+function computeProjectPoints(tasks) {
+  return (tasks || []).reduce((sum, task) => {
+    const status = normalizeStatus(task.status) || 'todo';
+    const w = getWeightValue(task.weight);
+    const hasPhotos = Boolean(task.has_photo_before) && Boolean(task.has_photo_after);
+    if (status === 'done' && hasPhotos) {
+      return sum + 80 * w;
+    }
+    return sum;
+  }, 0);
+}
+
+function computeDeadlineIndicators(project, tasks) {
+  const today = new Date();
+  const endDate = project?.end_date ? new Date(project.end_date) : null;
+  let overdueCount = 0;
+  let beyondEndCount = 0;
+  (tasks || []).forEach((task) => {
+    const status = normalizeStatus(task.status) || 'todo';
+    if (!task.due_date) return;
+    const due = new Date(task.due_date);
+    if (status !== 'done' && due < today) overdueCount += 1;
+    if (endDate && due > endDate) beyondEndCount += 1;
+  });
+  return { overdueCount, beyondEndCount };
+}
+
+function computeBudgetIndicators(tasks) {
+  const sumExpected = (tasks || []).reduce((sum, t) => sum + Number(t.cost_expected || 0), 0);
+  const sumReal = (tasks || []).reduce((sum, t) => sum + Number(t.cost_real || 0), 0);
+  return { sumExpected, sumReal, isOverBudget: sumReal > sumExpected };
+}
+
+function loadPointsLedger(userId, projectId) {
+  const key = `msh_points_${userId}_${projectId}`;
+  try {
+    return JSON.parse(localStorage.getItem(key) || '{}');
+  } catch (e) {
+    console.warn('Não foi possível ler ledger de pontos', e);
+    return {};
+  }
+}
+
+function savePointsLedger(userId, projectId, ledger) {
+  const key = `msh_points_${userId}_${projectId}`;
+  localStorage.setItem(key, JSON.stringify(ledger));
+}
+
 /**
  * Camada de UI: render de listas/detalhes.
  */
@@ -359,30 +428,28 @@ const ProjectUI = {
                 return `${cornerInfo?.name || ProjectDomain.findCornerName(lookups.corners, task.scope_id)} · ${subName}`;
               }
               if (task.scope_type === 'sub_area') {
-                return ProjectDomain.findSubAreaName(lookups.subAreas, task.scope_id);
-              }
-              return ProjectDomain.findAreaName(lookups.areas, task.scope_id);
-            })();
-            const metadata = `${scopeBadge} · peso ${task.weight || 'leve'} · custo ${task.cost_expected || 0}`;
-            return `
-              <article class="card kanban-card">
-                <div class="card-top">
-                  <p class="label">${task.title}</p>
-                  <span class="badge outline">${task.task_type || 'tarefa'}</span>
-                </div>
-                <p class="muted">${metadata}</p>
-                <div class="pill-row">
-                  <span class="pill">Prazo ${task.due_date || '—'}</span>
-                  ${
-                    task.photo_before_url && task.photo_after_url
-                      ? '<span class="pill">Fotos ok</span>'
-                      : '<span class="pill outline">Fotos pendentes</span>'
-                  }
-                </div>
-                <div class="card-actions">
-                  <button class="btn move" type="button" data-action="move-task" data-direction="left" data-task-id="${task.id}">←</button>
-                  <button class="btn move" type="button" data-action="move-task" data-direction="right" data-task-id="${task.id}">→</button>
-                </div>
+            return ProjectDomain.findSubAreaName(lookups.subAreas, task.scope_id);
+          }
+          return ProjectDomain.findAreaName(lookups.areas, task.scope_id);
+        })();
+        const metadata = `${scopeBadge} · peso ${task.weight || 'leve'} · custo ${task.cost_expected || 0}`;
+        const hasPhotos = task.has_photo_before || task.photo_before_url;
+        const hasAfter = task.has_photo_after || task.photo_after_url;
+        return `
+          <div class="kanban-column">
+            <div class="kanban-header">
+              <span>${st.label}</span>
+              <span class="kanban-counter">${items.length}</span>
+            </div>
+            <p class="muted">${metadata}</p>
+            <div class="pill-row">
+              <span class="pill">Prazo ${task.due_date || '—'}</span>
+              ${hasPhotos && hasAfter ? '<span class="pill">Fotos ok</span>' : '<span class="pill outline">Fotos pendentes</span>'}
+            </div>
+            <div class="card-actions">
+              <button class="btn move" type="button" data-action="move-task" data-direction="left" data-task-id="${task.id}">←</button>
+              <button class="btn move" type="button" data-action="move-task" data-direction="right" data-task-id="${task.id}">→</button>
+            </div>
               </article>
             `;
           })
@@ -410,6 +477,7 @@ const ProjectUI = {
 const ProjectPage = {
   state: {
     project: null,
+    projectTasks: [],
     areas: [],
     subAreas: [],
     corners: [],
@@ -517,35 +585,84 @@ const ProjectPage = {
     return { scope_type: null, scope_id: null };
   },
 
-  async loadTasks(projectId) {
+  applyScopeFilter() {
     const filter = this.currentScopeFilter();
-    if (!filter.scope_id) {
-      this.state.tasks = [];
-      ProjectUI.renderKanban(this.state.tasks, {
-        ...this.lookups(),
-        scopeId: null
-      });
-      return;
-    }
-    const { data, error } = await DB.listTasksByScope({
-      projectId,
-      scopeType: filter.scope_type,
+    const subset = filter.scope_id
+      ? this.state.projectTasks.filter((t) => t.scope_id && String(t.scope_id) === String(filter.scope_id))
+      : this.state.projectTasks;
+    this.state.tasks = subset;
+    ProjectUI.renderKanban(this.state.tasks, {
+      ...this.lookups(),
       scopeId: filter.scope_id
     });
+  },
+
+  updateDashboard() {
+    const grid = document.getElementById('dashboard-grid');
+    const empty = document.getElementById('dashboard-empty');
+    if (!grid || !empty) return;
+
+    const tasks = this.state.projectTasks || [];
+    if (!tasks.length) {
+      empty.classList.remove('hidden');
+      grid.innerHTML = '';
+      return;
+    }
+    empty.classList.add('hidden');
+
+    const progress = computeProjectProgress(tasks);
+    const points = computeProjectPoints(tasks);
+    const deadlines = computeDeadlineIndicators(this.state.project, tasks);
+    const budget = computeBudgetIndicators(tasks);
+
+    const cards = [
+      { label: 'Progresso do projeto', value: `${progress.progressPercent}%`, caption: `Peso total ${progress.W}` },
+      { label: 'Pontos', value: points, caption: '80 × peso (tarefas concluídas com fotos)' },
+      { label: 'Tarefas atrasadas', value: deadlines.overdueCount, caption: 'Hoje > due_date e status != done' },
+      {
+        label: 'Prazos após término',
+        value: deadlines.beyondEndCount,
+        caption: this.state.project?.end_date ? `Due > ${this.state.project.end_date}` : 'Projeto sem data final'
+      },
+      {
+        label: 'Orçado × Real',
+        value: `R$ ${Number(budget.sumExpected || 0).toFixed(2)} / R$ ${Number(budget.sumReal || 0).toFixed(2)}`,
+        caption: 'Somatório em runtime (não persiste em projects)'
+      },
+      {
+        label: 'Orçamento estourado',
+        value: budget.isOverBudget ? 'Sim' : 'Não',
+        caption: budget.isOverBudget ? 'Real > Orçado' : 'Dentro do orçado'
+      }
+    ];
+
+    grid.innerHTML = cards
+      .map(
+        (card) => `
+        <article class="card metric-card">
+          <p class="eyebrow">${card.label}</p>
+          <h2>${card.value}</h2>
+          <p class="muted small">${card.caption}</p>
+        </article>
+      `
+      )
+      .join('');
+  },
+
+  async loadTasks(projectId) {
+    const { data, error } = await DB.listTasksByProject(projectId);
     if (error) {
       console.error(error);
       App.showToast('Não foi possível carregar tarefas.');
       return;
     }
-    this.state.tasks = (data || []).map((task) => ({
+    this.state.projectTasks = (data || []).map((task) => ({
       ...task,
       status: normalizeStatus(task.status) || 'todo',
       weight: normalizeWeight(task.weight) || 'medium'
     }));
-    ProjectUI.renderKanban(this.state.tasks, {
-      ...this.lookups(),
-      scopeId: filter.scope_id
-    });
+    this.applyScopeFilter();
+    this.updateDashboard();
   },
 
   bindAreaForm(projectId) {
@@ -805,11 +922,14 @@ const ProjectPage = {
       }
       App.showToast('Tarefa criada.');
       form.reset();
-      this.state.tasks.unshift(data);
-      ProjectUI.renderKanban(this.state.tasks, {
-        ...this.lookups(),
-        scopeId: filter.scope_id
-      });
+      const normalized = {
+        ...data,
+        status: normalizeStatus(data.status) || 'todo',
+        weight: normalizeWeight(data.weight) || 'medium'
+      };
+      this.state.projectTasks.unshift(normalized);
+      this.applyScopeFilter();
+      this.updateDashboard();
     });
   },
 
@@ -837,7 +957,8 @@ const ProjectPage = {
 
     const syncAndLoad = async () => {
       this.syncScopeFromUI();
-      await this.loadTasks(this.state.project.id);
+      this.applyScopeFilter();
+      this.updateDashboard();
     };
 
     typeSel.addEventListener('change', syncAndLoad);
@@ -925,7 +1046,9 @@ const ProjectPage = {
     if (nextIdx < 0 || nextIdx >= order.length) return;
     const nextStatus = order[nextIdx];
 
-    if (nextStatus === 'done' && !(task.photo_before_url && task.photo_after_url)) {
+    const hasPhotosBefore = task.has_photo_before || task.photo_before_url;
+    const hasPhotosAfter = task.has_photo_after || task.photo_after_url;
+    if (nextStatus === 'done' && !(hasPhotosBefore && hasPhotosAfter)) {
       App.showToast('Adicione fotos antes/depois antes de concluir.');
       return;
     }
@@ -943,11 +1066,38 @@ const ProjectPage = {
       App.showToast('Não foi possível mover a tarefa.');
       return;
     }
-    this.state.tasks = this.state.tasks.map((t) => (String(t.id) === String(id) ? data : t));
-    ProjectUI.renderKanban(this.state.tasks, {
-      ...this.lookups(),
-      scopeId: this.currentScopeFilter().scope_id
-    });
+    const normalized = {
+      ...data,
+      status: normalizeStatus(data.status) || mappedStatus,
+      weight: normalizeWeight(data.weight) || 'medium'
+    };
+    this.state.projectTasks = this.state.projectTasks.map((t) =>
+      String(t.id) === String(id) ? normalized : t
+    );
+    this.applyScopeFilter();
+    this.updateDashboard();
+
+    // Pontuação ao concluir (apenas se fotos ok e não pontuado anteriormente).
+    if (mappedStatus === 'done') {
+      const { session } = await DB.getSession();
+      const userId = session?.user?.id;
+      if (userId) {
+        const ledger = loadPointsLedger(userId, this.state.project.id);
+        const alreadyScored = ledger[id];
+        const hasPhotos = normalized.has_photo_before && normalized.has_photo_after;
+        if (!alreadyScored && hasPhotos) {
+          const delta = 80 * getWeightValue(normalized.weight);
+          const { error: pointsError } = await DB.updateUserLifetimePoints(delta);
+          if (!pointsError) {
+            ledger[id] = true;
+            savePointsLedger(userId, this.state.project.id, ledger);
+            console.info('Pontuação aplicada', { taskId: id, delta });
+          } else {
+            console.warn('Falha ao atualizar pontos', pointsError);
+          }
+        }
+      }
+    }
   }
 };
 

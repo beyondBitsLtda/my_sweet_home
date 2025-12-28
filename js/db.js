@@ -383,6 +383,33 @@ const DB = (() => {
     return updateTask(taskId, { status: normalized });
   }
 
+  async function updateUserLifetimePoints(deltaPoints) {
+    const supabase = initSupabase();
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) return { data: null, error: sessionError };
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) return { data: null, error: new Error('Usuário não autenticado') };
+    console.info('Atualizando pontos do usuário', { userId, deltaPoints });
+
+    // Estratégia simples V1: busca o valor atual e soma o delta (pequena base de usuários).
+    const { data: profile, error: fetchError } = await supabase
+      .from('users_profile')
+      .select('total_points_lifetime')
+      .eq('id', userId)
+      .single();
+    if (fetchError) return { data: null, error: fetchError };
+
+    const nextTotal = Number(profile?.total_points_lifetime || 0) + Number(deltaPoints || 0);
+    const { data, error } = await supabase
+      .from('users_profile')
+      .update({ total_points_lifetime: nextTotal })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    return { data, error };
+  }
+
   /**
    * deleteProject
    * - Exclui um projeto pertencente ao usuário logado.
@@ -464,6 +491,7 @@ const DB = (() => {
     listTasksByProject,
     listTasksByScope,
     updateTaskStatus,
+    updateUserLifetimePoints,
     normalizeStatus,
     normalizeWeight,
     buildTaskPayload

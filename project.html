@@ -184,32 +184,14 @@
             <div>
               <p class="eyebrow">Indicadores</p>
               <h3>Saúde do projeto</h3>
-              <p class="muted">Dashboard minimalista com cartões de métricas para inspirar a futura implementação real.</p>
+              <p class="muted">Cálculo em runtime: progresso, pontos, prazos e orçamento sem persistir no banco.</p>
             </div>
-            <button class="btn ghost" type="button">Exportar</button>
           </div>
-          <div class="grid metrics">
-            <article class="card metric-card">
-              <p class="label">Progresso</p>
-              <h2>72%</h2>
-              <p class="muted">Calculado a partir do peso das tarefas concluídas.</p>
-            </article>
-            <article class="card metric-card">
-              <p class="label">Pontos</p>
-              <h2>480</h2>
-              <p class="muted">Pontuação gamificada considerando fotos antes/depois.</p>
-            </article>
-            <article class="card metric-card">
-              <p class="label">Orçado × Real</p>
-              <h2>R$ 28k / R$ 30k</h2>
-              <p class="muted">Ilustra a comparação de custos planejados e reais.</p>
-            </article>
-            <article class="card metric-card">
-              <p class="label">Pendências de fotos</p>
-              <h2 class="danger">3</h2>
-              <p class="muted">Bloqueiam a conclusão de tarefas pesadas.</p>
-            </article>
+          <div id="dashboard-empty" class="kanban-empty-state hidden">
+            <p class="empty-text">Sem tarefas ainda. Crie sua primeira tarefa para ver progresso e indicadores.</p>
+            <button class="btn ghost" type="button" onclick="document.querySelector('[data-tab=\\\"kanban\\\"]').click()">Ir para Kanban</button>
           </div>
+          <div class="dashboard-grid" id="dashboard-grid"></div>
         </div>
       </section>
     </section>
