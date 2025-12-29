@@ -250,6 +250,11 @@ a {
   font-size: 0.9rem;
 }
 
+.inline-hint {
+  margin: calc(var(--space-2) - 2px) 0 0;
+  line-height: 1.4;
+}
+
 .auth-page .auth-hero {
   display: flex;
   justify-content: center;
@@ -286,6 +291,23 @@ a {
 .project-card h3 {
   font-family: var(--font-heading);
   margin: var(--space-2) 0;
+}
+
+.project-cover {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: #fdfbf8;
+}
+
+.project-cover.placeholder {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #f8f3ec 0%, #ffffff 100%);
+  color: var(--color-muted);
+  font-weight: 600;
 }
 
 .muted-card {
@@ -446,6 +468,22 @@ textarea:focus {
   border-color: var(--color-text);
 }
 
+.reset-link-row {
+  justify-content: flex-start;
+  border-bottom: none;
+  margin-top: calc(var(--space-1) * -1);
+}
+
+.reset-link {
+  padding: 0;
+  border: none;
+  color: var(--color-text);
+}
+
+.reset-link.active {
+  text-decoration: underline;
+}
+
 .tab-panel {
   display: block;
 }
@@ -590,6 +628,17 @@ textarea:focus {
   max-width: 100%;
   border: 1px solid var(--color-border);
   border-radius: 10px;
+  background: #fdfbf8;
+  padding: var(--space-3);
+}
+
+.photo-preview img {
+  width: 100%;
+  height: auto;
+  max-height: 260px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
 }
 
 .grid.metrics {

@@ -76,6 +76,15 @@
           <label class="muted" for "budgetReal">Budget real</label>
           <input class="input" type="number" id="budgetReal" name="budget_real" placeholder="0" />
 
+          <label class="muted" for="projectCover">Foto do projeto (capa)</label>
+          <div class="photo-input">
+            <input class="input" type="file" id="projectCover" name="cover_file" accept="image/*" />
+            <div class="photo-preview" id="projectCoverPreview">
+              <img class="hidden" id="projectCoverPreviewImage" alt="Pré-visualização da capa" />
+              <p class="muted small" id="projectCoverPreviewHint">Pré-visualização aparecerá aqui.</p>
+            </div>
+          </div>
+
           <button class="btn primary" type="submit" id="createProjectSubmit">Criar</button>
         </form>
       </div>
