@@ -182,6 +182,28 @@ const DB = (() => {
     return supabase.auth.resetPasswordForEmail(email, { redirectTo });
   }
 
+  /**
+   * checkEmailExists
+   * - Usa signInWithOtp com shouldCreateUser:false para detectar se o email já possui conta.
+   * - Não cria usuário novo; se não existir, o Supabase devolve erro user_not_found.
+   */
+  async function checkEmailExists(email) {
+    const supabase = initSupabase();
+    const baseUrl = new URL('./', window.location.href);
+    const redirectTo = new URL('index.html', baseUrl).toString();
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false, emailRedirectTo: redirectTo }
+    });
+
+    if (!error) return { exists: true, error: null };
+    const message = (error.message || '').toLowerCase();
+    if (message.includes('not found')) return { exists: false, error: null };
+
+    return { exists: false, error };
+  }
+
   /** Faz logout limpando a sessão atual. */
   async function authSignOut() {
     const supabase = initSupabase();
@@ -194,6 +216,57 @@ const DB = (() => {
     const supabase = initSupabase();
     const { data, error } = await supabase.auth.getSession();
     return { session: data?.session ?? null, error };
+  }
+
+  /**
+   * uploadProjectCover
+   * - Envia a imagem de capa para o bucket project-covers.
+   */
+  async function uploadProjectCover(userId, projectId, file) {
+    if (!file) return { error: null, url: null, path: null };
+    const supabase = initSupabase();
+    const ext = (file.name?.split('.').pop() || 'jpg').toLowerCase();
+    const path = `${userId}/${projectId}/cover.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('project-covers')
+      .upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' });
+    if (uploadError) return { error: uploadError, url: null, path: null };
+
+    const { data: publicData } = supabase.storage.from('project-covers').getPublicUrl(path);
+    return { error: null, url: publicData?.publicUrl ?? null, path };
+  }
+
+  async function updateProjectCover(projectId, userId, coverUrl, coverPath) {
+    const supabase = initSupabase();
+    const payload = {};
+    if (typeof coverUrl !== 'undefined') payload.cover_url = coverUrl;
+    if (typeof coverPath !== 'undefined') payload.cover_path = coverPath;
+    return supabase.from('projects').update(payload).eq('id', projectId).eq('user_id', userId).select().single();
+  }
+
+  async function getSignedProjectCoverUrl(coverPath) {
+    const supabase = initSupabase();
+    const { data, error } = await supabase.storage.from('project-covers').createSignedUrl(coverPath, 3600);
+    if (error) {
+      console.warn('Não foi possível gerar signed URL da capa', error);
+      return null;
+    }
+    return data?.signedUrl ?? null;
+  }
+
+  async function getProjectCoverUrl(project) {
+    const supabase = initSupabase();
+    const coverUrl = project?.cover_url || null;
+    const coverPath = project?.cover_path || null;
+    console.log('project cover fields', { id: project?.id, cover_url: coverUrl, cover_path: coverPath });
+
+    if (coverUrl) return coverUrl;
+    if (!coverPath) return null;
+
+    const { data: publicData } = supabase.storage.from('project-covers').getPublicUrl(coverPath);
+    if (publicData?.publicUrl) return publicData.publicUrl;
+
+    return getSignedProjectCoverUrl(coverPath);
   }
 
   // ---------------------------
@@ -476,8 +549,13 @@ const DB = (() => {
     authSignInWithPassword,
     authSignUp,
     authResetPassword,
+    checkEmailExists,
     authSignOut,
     getSession,
+    uploadProjectCover,
+    updateProjectCover,
+    getSignedProjectCoverUrl,
+    getProjectCoverUrl,
     onAuthStateChange,
     upsertProfile,
     createProject,
