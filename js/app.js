@@ -8,7 +8,10 @@ const App = {
     currentTab: 'structure',
     toastTimer: null,
     isSendingOtp: false, // evita múltiplos envios e respeita o rate limit do Supabase (>=3s)
-    projects: []
+    projects: [],
+    signupEmailTimer: null,
+    signupEmailExists: false,
+    signupEmailCheckToken: null
   },
 
   // Navegação básica entre páginas HTML estáticas.
@@ -97,6 +100,27 @@ const App = {
     App.state.toastTimer = setTimeout(() => {
       toast.classList.add('hidden');
     }, duration);
+  },
+
+  /**
+   * resetSignupBlockers
+   * - Limpa mensagens e reabilita o botão de submit ao sair do modo signup ou apagar email.
+   */
+  resetSignupBlockers() {
+    const helper = document.getElementById('signup-email-status');
+    const submit = document.getElementById('auth-submit');
+    App.state.signupEmailExists = false;
+    App.state.signupEmailCheckToken = null;
+    if (App.state.signupEmailTimer) {
+      clearTimeout(App.state.signupEmailTimer);
+      App.state.signupEmailTimer = null;
+    }
+    if (submit) submit.disabled = false;
+    if (helper) {
+      helper.textContent = '';
+      helper.classList.add('hidden');
+      helper.classList.remove('danger', 'inline-hint');
+    }
   },
 
   /**
@@ -194,6 +218,11 @@ const App = {
     const passwordGroup = document.getElementById('password-group');
     const confirmGroup = document.getElementById('confirm-group');
     const signupNote = document.getElementById('signup-note');
+    const emailInput = document.getElementById('loginEmail');
+
+    if (mode !== 'signup') {
+      App.resetSignupBlockers();
+    }
 
     if (mode === 'signup') {
       helper.textContent = 'Use email e senha fortes. Se o email já existir, mostraremos a mensagem para fazer login.';
@@ -222,6 +251,91 @@ const App = {
     }
 
     submit.dataset.mode = mode;
+    if (mode === 'signup' && emailInput) {
+      App.handleSignupEmailInput({ target: emailInput });
+    }
+  },
+
+  /**
+   * handleSignupEmailInput
+   * - Faz debounce de verificação de email existente apenas quando a aba for “Criar conta”.
+   */
+  handleSignupEmailInput(event) {
+    const mode = document.querySelector('.auth-tabs .tab.active')?.dataset?.mode || 'login';
+    if (mode !== 'signup') {
+      App.resetSignupBlockers();
+      return;
+    }
+
+    const email = (event?.target?.value || '').trim();
+    const status = document.getElementById('signup-email-status');
+    const submit = document.getElementById('auth-submit');
+
+    if (status) {
+      status.classList.add('hidden');
+      status.classList.remove('danger', 'inline-hint');
+      status.textContent = '';
+    }
+    if (submit) submit.disabled = false;
+    if (App.state.signupEmailTimer) clearTimeout(App.state.signupEmailTimer);
+
+    if (!email) {
+      App.state.signupEmailExists = false;
+      return;
+    }
+
+    App.state.signupEmailTimer = setTimeout(() => App.checkSignupEmailAvailability(email), 600);
+  },
+
+  /**
+   * checkSignupEmailAvailability
+   * - Chama Supabase com debounce para descobrir se o email já tem conta.
+   */
+  async checkSignupEmailAvailability(email) {
+    const helper = document.getElementById('signup-email-status');
+    const submit = document.getElementById('auth-submit');
+    if (!submit || typeof window.supabase !== 'object') return;
+
+    const checkToken = Date.now();
+    App.state.signupEmailCheckToken = checkToken;
+
+    if (helper) {
+      helper.classList.remove('hidden');
+      helper.classList.remove('danger');
+      helper.textContent = 'Verificando disponibilidade...';
+    }
+
+    const { exists, error } = await DB.checkEmailExists(email);
+
+    // Ignora respostas antigas se um novo check foi disparado.
+    if (App.state.signupEmailCheckToken !== checkToken) return;
+
+    if (error) {
+      console.warn('Não foi possível verificar email no Supabase.', error);
+      if (helper) helper.classList.add('hidden');
+      submit.disabled = false;
+      App.state.signupEmailExists = false;
+      return;
+    }
+
+    if (exists) {
+      if (helper) {
+        helper.textContent = 'Esse email já possui conta. Vá para Entrar.';
+        helper.classList.remove('hidden');
+        helper.classList.add('danger', 'inline-hint');
+      }
+      submit.disabled = true;
+      App.state.signupEmailExists = true;
+      return;
+    }
+
+    if (helper) {
+      helper.textContent = '';
+      helper.classList.add('hidden');
+      helper.classList.remove('danger');
+    }
+    submit.disabled = false;
+    App.state.signupEmailExists = false;
   },
 
   /**
@@ -247,6 +361,10 @@ const App = {
     const email = (document.getElementById('loginEmail')?.value || '').trim();
     if (!email) {
       App.showToast('Informe um e-mail válido.');
+      return;
+    }
+    if (mode === 'signup' && App.state.signupEmailExists) {
+      App.showToast('Esse email já possui conta. Vá para Entrar.');
       return;
     }
 
@@ -369,7 +487,13 @@ const App = {
       grid.innerHTML = '<p class="muted">Não foi possível carregar projetos.</p>';
       return;
     }
-    App.state.projects = data || [];
+    const enriched = await Promise.all(
+      (data || []).map(async (proj) => {
+        const resolvedCover = await DB.getProjectCoverUrl(proj);
+        return { ...proj, resolved_cover_url: resolvedCover };
+      })
+    );
+    App.state.projects = enriched;
     App.renderProjects(App.state.projects, grid);
   },
 
@@ -384,8 +508,16 @@ const App = {
         const progress = 72;
         const period = proj.start_date && proj.end_date ? `${proj.start_date} · ${proj.end_date}` : 'Sem datas';
         const budget = proj.budget_expected ? `Budget R$ ${proj.budget_expected}` : 'Budget não definido';
+        const coverSrc = proj.cover_url || proj.resolved_cover_url || null;
+        const cover = coverSrc
+          ? `<div class="project-cover-shell">
+              <img class="project-cover" src="${coverSrc}" alt="Capa do projeto ${proj.name}" data-cover-path="${proj.cover_path || ''}" onerror="App.handleCoverError(event)" />
+              <div class="project-cover placeholder hidden"><span class="muted">Sem foto</span></div>
+            </div>`
+          : `<div class="project-cover placeholder"><span class="muted">Sem foto</span></div>`;
         return `
         <article class="card project-card">
+          ${cover}
           <div class="card-top">
             <p class="eyebrow">${proj.home_type === 'apartment' ? 'Apartamento' : 'Outro'}</p>
             <span class="badge outline">${proj.mode || 'macro'}</span>
@@ -404,6 +536,39 @@ const App = {
       })
       .join('');
     container.innerHTML = cards;
+  },
+
+  handleCoverError(event) {
+    const img = event?.target;
+    if (!img) return;
+    const shell = img.closest('.project-cover-shell');
+    const placeholder = shell?.querySelector('.project-cover.placeholder');
+    const coverPath = img.dataset.coverPath;
+
+    // Se já tentamos fallback, mostra placeholder.
+    if (img.dataset.signedTried === 'true' || !coverPath) {
+      console.warn('Capa do projeto não carregou', img.src);
+      img.onerror = null;
+      img.classList.add('hidden');
+      if (placeholder) placeholder.classList.remove('hidden');
+      return;
+    }
+
+    // Tenta gerar signed URL como fallback final.
+    img.dataset.signedTried = 'true';
+    DB.getSignedProjectCoverUrl(coverPath).then((signedUrl) => {
+      if (signedUrl) {
+        console.info('Usando signed URL para capa do projeto', signedUrl);
+        img.src = signedUrl;
+        if (placeholder) placeholder.classList.add('hidden');
+        img.classList.remove('hidden');
+      } else {
+        console.warn('Não foi possível carregar a capa, exibindo placeholder', img.src);
+        img.onerror = null;
+        img.classList.add('hidden');
+        if (placeholder) placeholder.classList.remove('hidden');
+      }
+    });
   },
 
   /**
@@ -455,6 +620,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (loginForm) {
     loginForm.addEventListener('submit', (event) => App.handleLogin(event));
   }
+  const loginEmail = document.getElementById('loginEmail');
+  if (loginEmail) {
+    loginEmail.addEventListener('input', (event) => App.handleSignupEmailInput(event));
+  }
   const submitBtn = document.getElementById('auth-submit');
   if (submitBtn && !submitBtn.dataset.mode) submitBtn.dataset.mode = 'login';
 
@@ -475,6 +644,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     await App.loadProjects(App.state.user);
 
     const createForm = document.getElementById('createProjectForm');
+    const coverInput = document.getElementById('projectCoverInput');
+    const coverPreview = document.getElementById('projectCoverPreview');
+    const coverPreviewImg = document.getElementById('projectCoverPreviewImage');
+    const coverPreviewHint = document.getElementById('projectCoverPreviewHint');
+
+    const resetCoverPreview = () => {
+      if (coverPreviewImg) {
+        coverPreviewImg.src = '';
+        coverPreviewImg.classList.add('hidden');
+      }
+      if (coverPreviewHint) {
+        coverPreviewHint.textContent = 'Pré-visualização aparecerá aqui.';
+        coverPreviewHint.classList.remove('hidden');
+      }
+      if (coverPreview) coverPreview.classList.remove('has-image');
+    };
+
+    const showCoverPreview = (file) => {
+      if (!coverPreviewImg || !coverPreviewHint) return;
+      if (!file) {
+        resetCoverPreview();
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      coverPreviewImg.src = url;
+      coverPreviewImg.classList.remove('hidden');
+      coverPreviewHint.textContent = 'A imagem será enviada após criar o projeto.';
+      coverPreviewHint.classList.remove('hidden');
+      if (coverPreview) coverPreview.classList.add('has-image');
+    };
+
+    if (coverInput) {
+      coverInput.addEventListener('change', (ev) => {
+        const file = ev.target.files?.[0];
+        showCoverPreview(file);
+      });
+    }
+
     if (createForm) {
       createForm.addEventListener('submit', async (ev) => {
         ev.preventDefault();
@@ -496,6 +703,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           budget_expected: createForm.budget_expected.value ? Number(createForm.budget_expected.value) : null,
           budget_real: createForm.budget_real.value ? Number(createForm.budget_real.value) : null
         };
+        const coverInputEl = document.getElementById('projectCoverInput');
+        const coverFile = coverInputEl?.files?.[0] || null;
+        console.log('[cover] input exists?', !!coverInputEl);
+        console.log('[cover] file', coverFile ? { name: coverFile.name, type: coverFile.type, size: coverFile.size } : null);
         const { data, error } = await DB.createProject(payload);
         if (error) {
           console.error(error);
@@ -503,7 +714,29 @@ document.addEventListener('DOMContentLoaded', async () => {
           return;
         }
         App.showToast('Projeto criado.');
+        let coverUrl = null;
+        if (coverFile) {
+          const { data: uploadData, error: uploadError } = await DB.uploadProjectCover(App.state.user.id, data.id, coverFile);
+          if (uploadError) {
+            console.warn('Falha ao enviar capa do projeto', uploadError);
+            App.showToast('Não foi possível enviar a capa. O projeto foi criado sem foto.');
+          } else if (uploadData?.cover_url || uploadData?.cover_path) {
+            const { data: updated, error: updateError } = await DB.updateProjectCover(
+              data.id,
+              App.state.user.id,
+              uploadData.cover_url,
+              uploadData.cover_path
+            );
+            if (updateError) {
+              console.warn('Falha ao salvar capa do projeto', updateError);
+              App.showToast('Projeto criado, mas não foi possível salvar a capa.');
+            } else {
+              coverUrl = updated?.cover_url || uploadData.cover_url || null;
+            }
+          }
+        }
         createForm.reset();
+        resetCoverPreview();
         await App.loadProjects(App.state.user);
       });
     }
