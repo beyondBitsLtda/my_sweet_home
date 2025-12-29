@@ -48,7 +48,6 @@
         <div class="tabs auth-tabs" role="tablist">
           <button class="tab active" data-mode="login" onclick="App.switchAuthTab(event)">Entrar</button>
           <button class="tab" data-mode="signup" onclick="App.switchAuthTab(event)">Criar conta</button>
-          <button class="tab" data-mode="reset" onclick="App.switchAuthTab(event)">Esqueci minha senha</button>
         </div>
 
         <form id="loginForm" class="auth-form">
@@ -58,6 +57,10 @@
           <div id="password-group">
             <label class="muted" for="loginPassword">Senha</label>
             <input class="input" type="password" id="loginPassword" name="password" placeholder="Mínimo 8 caracteres" required />
+          </div>
+
+          <div class="auth-tabs reset-link-row">
+            <button class="tab reset-link" type="button" data-mode="reset" onclick="App.switchAuthTab(event)">Esqueci minha senha</button>
           </div>
 
           <div id="confirm-group" class="hidden">

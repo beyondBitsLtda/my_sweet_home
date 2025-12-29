@@ -446,6 +446,22 @@ textarea:focus {
   border-color: var(--color-text);
 }
 
+.reset-link-row {
+  justify-content: flex-start;
+  border-bottom: none;
+  margin-top: calc(var(--space-1) * -1);
+}
+
+.reset-link {
+  padding: 0;
+  border: none;
+  color: var(--color-text);
+}
+
+.reset-link.active {
+  text-decoration: underline;
+}
+
 .tab-panel {
   display: block;
 }
