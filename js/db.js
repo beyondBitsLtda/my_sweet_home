@@ -182,6 +182,28 @@ const DB = (() => {
     return supabase.auth.resetPasswordForEmail(email, { redirectTo });
   }
 
+  /**
+   * checkEmailExists
+   * - Usa signInWithOtp com shouldCreateUser:false para detectar se o email já possui conta.
+   * - Não cria usuário novo; se não existir, o Supabase devolve erro user_not_found.
+   */
+  async function checkEmailExists(email) {
+    const supabase = initSupabase();
+    const baseUrl = new URL('./', window.location.href);
+    const redirectTo = new URL('index.html', baseUrl).toString();
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false, emailRedirectTo: redirectTo }
+    });
+
+    if (!error) return { exists: true, error: null };
+    const message = (error.message || '').toLowerCase();
+    if (message.includes('not found')) return { exists: false, error: null };
+
+    return { exists: false, error };
+  }
+
   /** Faz logout limpando a sessão atual. */
   async function authSignOut() {
     const supabase = initSupabase();
@@ -476,6 +498,7 @@ const DB = (() => {
     authSignInWithPassword,
     authSignUp,
     authResetPassword,
+    checkEmailExists,
     authSignOut,
     getSession,
     onAuthStateChange,

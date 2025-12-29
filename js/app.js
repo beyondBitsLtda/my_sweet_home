@@ -8,7 +8,10 @@ const App = {
     currentTab: 'structure',
     toastTimer: null,
     isSendingOtp: false, // evita múltiplos envios e respeita o rate limit do Supabase (>=3s)
-    projects: []
+    projects: [],
+    signupEmailTimer: null,
+    signupEmailExists: false,
+    signupEmailCheckToken: null
   },
 
   // Navegação básica entre páginas HTML estáticas.
@@ -97,6 +100,27 @@ const App = {
     App.state.toastTimer = setTimeout(() => {
       toast.classList.add('hidden');
     }, duration);
+  },
+
+  /**
+   * resetSignupBlockers
+   * - Limpa mensagens e reabilita o botão de submit ao sair do modo signup ou apagar email.
+   */
+  resetSignupBlockers() {
+    const helper = document.getElementById('signup-email-status');
+    const submit = document.getElementById('auth-submit');
+    App.state.signupEmailExists = false;
+    App.state.signupEmailCheckToken = null;
+    if (App.state.signupEmailTimer) {
+      clearTimeout(App.state.signupEmailTimer);
+      App.state.signupEmailTimer = null;
+    }
+    if (submit) submit.disabled = false;
+    if (helper) {
+      helper.textContent = '';
+      helper.classList.add('hidden');
+      helper.classList.remove('danger', 'inline-hint');
+    }
   },
 
   /**
@@ -194,6 +218,11 @@ const App = {
     const passwordGroup = document.getElementById('password-group');
     const confirmGroup = document.getElementById('confirm-group');
     const signupNote = document.getElementById('signup-note');
+    const emailInput = document.getElementById('loginEmail');
+
+    if (mode !== 'signup') {
+      App.resetSignupBlockers();
+    }
 
     if (mode === 'signup') {
       helper.textContent = 'Use email e senha fortes. Se o email já existir, mostraremos a mensagem para fazer login.';
@@ -222,6 +251,91 @@ const App = {
     }
 
     submit.dataset.mode = mode;
+    if (mode === 'signup' && emailInput) {
+      App.handleSignupEmailInput({ target: emailInput });
+    }
+  },
+
+  /**
+   * handleSignupEmailInput
+   * - Faz debounce de verificação de email existente apenas quando a aba for “Criar conta”.
+   */
+  handleSignupEmailInput(event) {
+    const mode = document.querySelector('.auth-tabs .tab.active')?.dataset?.mode || 'login';
+    if (mode !== 'signup') {
+      App.resetSignupBlockers();
+      return;
+    }
+
+    const email = (event?.target?.value || '').trim();
+    const status = document.getElementById('signup-email-status');
+    const submit = document.getElementById('auth-submit');
+
+    if (status) {
+      status.classList.add('hidden');
+      status.classList.remove('danger', 'inline-hint');
+      status.textContent = '';
+    }
+    if (submit) submit.disabled = false;
+    if (App.state.signupEmailTimer) clearTimeout(App.state.signupEmailTimer);
+
+    if (!email) {
+      App.state.signupEmailExists = false;
+      return;
+    }
+
+    App.state.signupEmailTimer = setTimeout(() => App.checkSignupEmailAvailability(email), 600);
+  },
+
+  /**
+   * checkSignupEmailAvailability
+   * - Chama Supabase com debounce para descobrir se o email já tem conta.
+   */
+  async checkSignupEmailAvailability(email) {
+    const helper = document.getElementById('signup-email-status');
+    const submit = document.getElementById('auth-submit');
+    if (!submit || typeof window.supabase !== 'object') return;
+
+    const checkToken = Date.now();
+    App.state.signupEmailCheckToken = checkToken;
+
+    if (helper) {
+      helper.classList.remove('hidden');
+      helper.classList.remove('danger');
+      helper.textContent = 'Verificando disponibilidade...';
+    }
+
+    const { exists, error } = await DB.checkEmailExists(email);
+
+    // Ignora respostas antigas se um novo check foi disparado.
+    if (App.state.signupEmailCheckToken !== checkToken) return;
+
+    if (error) {
+      console.warn('Não foi possível verificar email no Supabase.', error);
+      if (helper) helper.classList.add('hidden');
+      submit.disabled = false;
+      App.state.signupEmailExists = false;
+      return;
+    }
+
+    if (exists) {
+      if (helper) {
+        helper.textContent = 'Esse email já possui conta. Vá para Entrar.';
+        helper.classList.remove('hidden');
+        helper.classList.add('danger', 'inline-hint');
+      }
+      submit.disabled = true;
+      App.state.signupEmailExists = true;
+      return;
+    }
+
+    if (helper) {
+      helper.textContent = '';
+      helper.classList.add('hidden');
+      helper.classList.remove('danger');
+    }
+    submit.disabled = false;
+    App.state.signupEmailExists = false;
   },
 
   /**
@@ -247,6 +361,10 @@ const App = {
     const email = (document.getElementById('loginEmail')?.value || '').trim();
     if (!email) {
       App.showToast('Informe um e-mail válido.');
+      return;
+    }
+    if (mode === 'signup' && App.state.signupEmailExists) {
+      App.showToast('Esse email já possui conta. Vá para Entrar.');
       return;
     }
 
@@ -454,6 +572,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loginForm = document.getElementById('loginForm');
   if (loginForm) {
     loginForm.addEventListener('submit', (event) => App.handleLogin(event));
+  }
+  const loginEmail = document.getElementById('loginEmail');
+  if (loginEmail) {
+    loginEmail.addEventListener('input', (event) => App.handleSignupEmailInput(event));
   }
   const submitBtn = document.getElementById('auth-submit');
   if (submitBtn && !submitBtn.dataset.mode) submitBtn.dataset.mode = 'login';
