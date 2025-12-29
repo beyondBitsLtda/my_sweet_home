@@ -508,7 +508,7 @@ const App = {
         const progress = 72;
         const period = proj.start_date && proj.end_date ? `${proj.start_date} · ${proj.end_date}` : 'Sem datas';
         const budget = proj.budget_expected ? `Budget R$ ${proj.budget_expected}` : 'Budget não definido';
-        const coverSrc = proj.resolved_cover_url || proj.cover_url || null;
+        const coverSrc = proj.cover_url || proj.resolved_cover_url || null;
         const cover = coverSrc
           ? `<div class="project-cover-shell">
               <img class="project-cover" src="${coverSrc}" alt="Capa do projeto ${proj.name}" data-cover-path="${proj.cover_path || ''}" onerror="App.handleCoverError(event)" />
