@@ -644,7 +644,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await App.loadProjects(App.state.user);
 
     const createForm = document.getElementById('createProjectForm');
-    const coverInput = document.getElementById('projectCover');
+    const coverInput = document.getElementById('projectCoverInput');
     const coverPreview = document.getElementById('projectCoverPreview');
     const coverPreviewImg = document.getElementById('projectCoverPreviewImage');
     const coverPreviewHint = document.getElementById('projectCoverPreviewHint');
@@ -703,7 +703,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           budget_expected: createForm.budget_expected.value ? Number(createForm.budget_expected.value) : null,
           budget_real: createForm.budget_real.value ? Number(createForm.budget_real.value) : null
         };
-        const coverFile = createForm.cover_file?.files?.[0] || null;
+        const coverInputEl = document.getElementById('projectCoverInput');
+        const coverFile = coverInputEl?.files?.[0] || null;
+        console.log('[cover] input exists?', !!coverInputEl);
+        console.log('[cover] file', coverFile ? { name: coverFile.name, type: coverFile.type, size: coverFile.size } : null);
         const { data, error } = await DB.createProject(payload);
         if (error) {
           console.error(error);
@@ -713,17 +716,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         App.showToast('Projeto criado.');
         let coverUrl = null;
         if (coverFile) {
-          const { url, path, error: uploadError } = await DB.uploadProjectCover(App.state.user.id, data.id, coverFile);
+          const { data: uploadData, error: uploadError } = await DB.uploadProjectCover(App.state.user.id, data.id, coverFile);
           if (uploadError) {
             console.warn('Falha ao enviar capa do projeto', uploadError);
-            App.showToast('Projeto criado, mas a capa não pôde ser enviada.');
-          } else if (url || path) {
-            const { data: updated, error: updateError } = await DB.updateProjectCover(data.id, App.state.user.id, url, path);
+            App.showToast('Não foi possível enviar a capa. O projeto foi criado sem foto.');
+          } else if (uploadData?.cover_url || uploadData?.cover_path) {
+            const { data: updated, error: updateError } = await DB.updateProjectCover(
+              data.id,
+              App.state.user.id,
+              uploadData.cover_url,
+              uploadData.cover_path
+            );
             if (updateError) {
               console.warn('Falha ao salvar capa do projeto', updateError);
               App.showToast('Projeto criado, mas não foi possível salvar a capa.');
             } else {
-              coverUrl = updated?.cover_url || url;
+              coverUrl = updated?.cover_url || uploadData.cover_url || null;
             }
           }
         }

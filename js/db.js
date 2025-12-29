@@ -223,17 +223,31 @@ const DB = (() => {
    * - Envia a imagem de capa para o bucket project-covers.
    */
   async function uploadProjectCover(userId, projectId, file) {
-    if (!file) return { error: null, url: null, path: null };
+    if (!file) return { error: null, data: null };
     const supabase = initSupabase();
-    const ext = (file.name?.split('.').pop() || 'jpg').toLowerCase();
+    const bucket = 'project-covers';
+    const nameExt = (file.name || '').split('.').pop();
+    const mimeExt = (() => {
+      const t = (file.type || '').toLowerCase();
+      if (t.includes('jpeg')) return 'jpg';
+      if (t.includes('png')) return 'png';
+      if (t.includes('webp')) return 'webp';
+      return null;
+    })();
+    const ext = (nameExt || mimeExt || 'jpg').toLowerCase();
     const path = `${userId}/${projectId}/cover.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from('project-covers')
-      .upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' });
-    if (uploadError) return { error: uploadError, url: null, path: null };
+    console.log('[cover] bucket/path', { bucket, path });
 
-    const { data: publicData } = supabase.storage.from('project-covers').getPublicUrl(path);
-    return { error: null, url: publicData?.publicUrl ?? null, path };
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg', cacheControl: '3600' });
+    if (error) {
+      console.error('[cover] upload error FULL', error);
+      return { data: null, error };
+    }
+
+    const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+    return { data: { cover_path: path, cover_url: pub?.publicUrl || null }, error: null };
   }
 
   async function updateProjectCover(projectId, userId, coverUrl, coverPath) {
