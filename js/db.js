@@ -218,6 +218,29 @@ const DB = (() => {
     return { session: data?.session ?? null, error };
   }
 
+  /**
+   * uploadProjectCover
+   * - Envia a imagem de capa para o bucket project-covers.
+   */
+  async function uploadProjectCover(userId, projectId, file) {
+    if (!file) return { error: null, url: null, path: null };
+    const supabase = initSupabase();
+    const ext = (file.name?.split('.').pop() || 'jpg').toLowerCase();
+    const path = `${userId}/${projectId}/cover.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('project-covers')
+      .upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' });
+    if (uploadError) return { error: uploadError, url: null, path: null };
+
+    const { data: publicData } = supabase.storage.from('project-covers').getPublicUrl(path);
+    return { error: null, url: publicData?.publicUrl ?? null, path };
+  }
+
+  async function updateProjectCover(projectId, userId, coverUrl) {
+    const supabase = initSupabase();
+    return supabase.from('projects').update({ cover_url: coverUrl }).eq('id', projectId).eq('user_id', userId).select().single();
+  }
+
   // ---------------------------
   // CRUD de projetos (V1)
   // ---------------------------
@@ -501,6 +524,8 @@ const DB = (() => {
     checkEmailExists,
     authSignOut,
     getSession,
+    uploadProjectCover,
+    updateProjectCover,
     onAuthStateChange,
     upsertProfile,
     createProject,

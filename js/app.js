@@ -502,8 +502,12 @@ const App = {
         const progress = 72;
         const period = proj.start_date && proj.end_date ? `${proj.start_date} · ${proj.end_date}` : 'Sem datas';
         const budget = proj.budget_expected ? `Budget R$ ${proj.budget_expected}` : 'Budget não definido';
+        const cover = proj.cover_url
+          ? `<img class="project-cover" src="${proj.cover_url}" alt="Capa do projeto ${proj.name}" />`
+          : `<div class="project-cover placeholder"><span class="muted">Sem foto</span></div>`;
         return `
         <article class="card project-card">
+          ${cover}
           <div class="card-top">
             <p class="eyebrow">${proj.home_type === 'apartment' ? 'Apartamento' : 'Outro'}</p>
             <span class="badge outline">${proj.mode || 'macro'}</span>
@@ -597,6 +601,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     await App.loadProjects(App.state.user);
 
     const createForm = document.getElementById('createProjectForm');
+    const coverInput = document.getElementById('projectCover');
+    const coverPreview = document.getElementById('projectCoverPreview');
+    const coverPreviewImg = document.getElementById('projectCoverPreviewImage');
+    const coverPreviewHint = document.getElementById('projectCoverPreviewHint');
+
+    const resetCoverPreview = () => {
+      if (coverPreviewImg) {
+        coverPreviewImg.src = '';
+        coverPreviewImg.classList.add('hidden');
+      }
+      if (coverPreviewHint) {
+        coverPreviewHint.textContent = 'Pré-visualização aparecerá aqui.';
+        coverPreviewHint.classList.remove('hidden');
+      }
+      if (coverPreview) coverPreview.classList.remove('has-image');
+    };
+
+    const showCoverPreview = (file) => {
+      if (!coverPreviewImg || !coverPreviewHint) return;
+      if (!file) {
+        resetCoverPreview();
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      coverPreviewImg.src = url;
+      coverPreviewImg.classList.remove('hidden');
+      coverPreviewHint.textContent = 'A imagem será enviada após criar o projeto.';
+      coverPreviewHint.classList.remove('hidden');
+      if (coverPreview) coverPreview.classList.add('has-image');
+    };
+
+    if (coverInput) {
+      coverInput.addEventListener('change', (ev) => {
+        const file = ev.target.files?.[0];
+        showCoverPreview(file);
+      });
+    }
+
     if (createForm) {
       createForm.addEventListener('submit', async (ev) => {
         ev.preventDefault();
@@ -618,6 +660,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           budget_expected: createForm.budget_expected.value ? Number(createForm.budget_expected.value) : null,
           budget_real: createForm.budget_real.value ? Number(createForm.budget_real.value) : null
         };
+        const coverFile = createForm.cover_file?.files?.[0] || null;
         const { data, error } = await DB.createProject(payload);
         if (error) {
           console.error(error);
@@ -625,7 +668,24 @@ document.addEventListener('DOMContentLoaded', async () => {
           return;
         }
         App.showToast('Projeto criado.');
+        let coverUrl = null;
+        if (coverFile) {
+          const { url, error: uploadError } = await DB.uploadProjectCover(App.state.user.id, data.id, coverFile);
+          if (uploadError) {
+            console.warn('Falha ao enviar capa do projeto', uploadError);
+            App.showToast('Projeto criado, mas a capa não pôde ser enviada.');
+          } else if (url) {
+            const { data: updated, error: updateError } = await DB.updateProjectCover(data.id, App.state.user.id, url);
+            if (updateError) {
+              console.warn('Falha ao salvar capa do projeto', updateError);
+              App.showToast('Projeto criado, mas não foi possível salvar a capa.');
+            } else {
+              coverUrl = updated?.cover_url || url;
+            }
+          }
+        }
         createForm.reset();
+        resetCoverPreview();
         await App.loadProjects(App.state.user);
       });
     }
