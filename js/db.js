@@ -236,9 +236,37 @@ const DB = (() => {
     return { error: null, url: publicData?.publicUrl ?? null, path };
   }
 
-  async function updateProjectCover(projectId, userId, coverUrl) {
+  async function updateProjectCover(projectId, userId, coverUrl, coverPath) {
     const supabase = initSupabase();
-    return supabase.from('projects').update({ cover_url: coverUrl }).eq('id', projectId).eq('user_id', userId).select().single();
+    const payload = {};
+    if (typeof coverUrl !== 'undefined') payload.cover_url = coverUrl;
+    if (typeof coverPath !== 'undefined') payload.cover_path = coverPath;
+    return supabase.from('projects').update(payload).eq('id', projectId).eq('user_id', userId).select().single();
+  }
+
+  async function getSignedProjectCoverUrl(coverPath) {
+    const supabase = initSupabase();
+    const { data, error } = await supabase.storage.from('project-covers').createSignedUrl(coverPath, 3600);
+    if (error) {
+      console.warn('Não foi possível gerar signed URL da capa', error);
+      return null;
+    }
+    return data?.signedUrl ?? null;
+  }
+
+  async function getProjectCoverUrl(project) {
+    const supabase = initSupabase();
+    const coverUrl = project?.cover_url || null;
+    const coverPath = project?.cover_path || null;
+    console.log('project cover fields', { id: project?.id, cover_url: coverUrl, cover_path: coverPath });
+
+    if (coverUrl) return coverUrl;
+    if (!coverPath) return null;
+
+    const { data: publicData } = supabase.storage.from('project-covers').getPublicUrl(coverPath);
+    if (publicData?.publicUrl) return publicData.publicUrl;
+
+    return getSignedProjectCoverUrl(coverPath);
   }
 
   // ---------------------------
@@ -526,6 +554,8 @@ const DB = (() => {
     getSession,
     uploadProjectCover,
     updateProjectCover,
+    getSignedProjectCoverUrl,
+    getProjectCoverUrl,
     onAuthStateChange,
     upsertProfile,
     createProject,

@@ -487,7 +487,13 @@ const App = {
       grid.innerHTML = '<p class="muted">Não foi possível carregar projetos.</p>';
       return;
     }
-    App.state.projects = data || [];
+    const enriched = await Promise.all(
+      (data || []).map(async (proj) => {
+        const resolvedCover = await DB.getProjectCoverUrl(proj);
+        return { ...proj, resolved_cover_url: resolvedCover };
+      })
+    );
+    App.state.projects = enriched;
     App.renderProjects(App.state.projects, grid);
   },
 
@@ -502,8 +508,12 @@ const App = {
         const progress = 72;
         const period = proj.start_date && proj.end_date ? `${proj.start_date} · ${proj.end_date}` : 'Sem datas';
         const budget = proj.budget_expected ? `Budget R$ ${proj.budget_expected}` : 'Budget não definido';
-        const cover = proj.cover_url
-          ? `<img class="project-cover" src="${proj.cover_url}" alt="Capa do projeto ${proj.name}" />`
+        const coverSrc = proj.resolved_cover_url || proj.cover_url || null;
+        const cover = coverSrc
+          ? `<div class="project-cover-shell">
+              <img class="project-cover" src="${coverSrc}" alt="Capa do projeto ${proj.name}" data-cover-path="${proj.cover_path || ''}" onerror="App.handleCoverError(event)" />
+              <div class="project-cover placeholder hidden"><span class="muted">Sem foto</span></div>
+            </div>`
           : `<div class="project-cover placeholder"><span class="muted">Sem foto</span></div>`;
         return `
         <article class="card project-card">
@@ -526,6 +536,39 @@ const App = {
       })
       .join('');
     container.innerHTML = cards;
+  },
+
+  handleCoverError(event) {
+    const img = event?.target;
+    if (!img) return;
+    const shell = img.closest('.project-cover-shell');
+    const placeholder = shell?.querySelector('.project-cover.placeholder');
+    const coverPath = img.dataset.coverPath;
+
+    // Se já tentamos fallback, mostra placeholder.
+    if (img.dataset.signedTried === 'true' || !coverPath) {
+      console.warn('Capa do projeto não carregou', img.src);
+      img.onerror = null;
+      img.classList.add('hidden');
+      if (placeholder) placeholder.classList.remove('hidden');
+      return;
+    }
+
+    // Tenta gerar signed URL como fallback final.
+    img.dataset.signedTried = 'true';
+    DB.getSignedProjectCoverUrl(coverPath).then((signedUrl) => {
+      if (signedUrl) {
+        console.info('Usando signed URL para capa do projeto', signedUrl);
+        img.src = signedUrl;
+        if (placeholder) placeholder.classList.add('hidden');
+        img.classList.remove('hidden');
+      } else {
+        console.warn('Não foi possível carregar a capa, exibindo placeholder', img.src);
+        img.onerror = null;
+        img.classList.add('hidden');
+        if (placeholder) placeholder.classList.remove('hidden');
+      }
+    });
   },
 
   /**
@@ -670,12 +713,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         App.showToast('Projeto criado.');
         let coverUrl = null;
         if (coverFile) {
-          const { url, error: uploadError } = await DB.uploadProjectCover(App.state.user.id, data.id, coverFile);
+          const { url, path, error: uploadError } = await DB.uploadProjectCover(App.state.user.id, data.id, coverFile);
           if (uploadError) {
             console.warn('Falha ao enviar capa do projeto', uploadError);
             App.showToast('Projeto criado, mas a capa não pôde ser enviada.');
-          } else if (url) {
-            const { data: updated, error: updateError } = await DB.updateProjectCover(data.id, App.state.user.id, url);
+          } else if (url || path) {
+            const { data: updated, error: updateError } = await DB.updateProjectCover(data.id, App.state.user.id, url, path);
             if (updateError) {
               console.warn('Falha ao salvar capa do projeto', updateError);
               App.showToast('Projeto criado, mas não foi possível salvar a capa.');
