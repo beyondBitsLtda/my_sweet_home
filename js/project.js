@@ -261,10 +261,11 @@ const ProjectUI = {
     const typeEl = document.getElementById('project-type');
     const periodEl = document.getElementById('project-period');
     const budgetEl = document.getElementById('project-budget');
+    const metaEl = document.getElementById('project-meta');
     const coverImg = document.getElementById('project-cover-img');
     const coverShell = document.getElementById('project-cover-shell');
     const coverOverlayText = document.getElementById('project-cover-placeholder-text');
-    if (!project || !nameEl || !typeEl || !periodEl || !budgetEl) return;
+    if (!project || !nameEl || !typeEl || !periodEl || !budgetEl || !metaEl) return;
 
     nameEl.textContent = project.name;
     typeEl.textContent = `${project.home_type || 'Tipo'} · ${project.mode || 'macro'}`;
@@ -325,6 +326,26 @@ const ProjectUI = {
         <p class="muted small budget-line ${isOverBudget ? 'budget-over' : ''}">${spentLabel}</p>
       </div>
     `;
+
+    if (coverImg) {
+      coverImg.alt = `Capa do projeto ${project.name || ''}`.trim();
+      let coverSrc = project.cover_url || null;
+      if (!coverSrc && project.cover_path) {
+        coverSrc = await DB.getProjectCoverUrl(project);
+      }
+      if (!coverSrc) {
+        coverSrc = 'assets/img/project_placeholder.webp';
+      }
+      coverImg.src = coverSrc;
+      coverImg.classList.remove('hidden');
+    }
+    const isPlaceholder = !project.cover_url && !project.cover_path;
+    if (coverShell) {
+      coverShell.classList.toggle('is-placeholder', isPlaceholder);
+    }
+    if (coverOverlayText) {
+      coverOverlayText.textContent = isPlaceholder ? 'Imagem placeholder' : 'Clique para trocar a capa';
+    }
   },
 
   renderAreas(areas) {
@@ -680,18 +701,6 @@ const ProjectPage = {
     this.bindAddRoomCard();
     this.bindScopeSelectors();
 
-    const entityCoverInput = document.getElementById('entity-cover-upload');
-    if (entityCoverInput) {
-      entityCoverInput.addEventListener('change', async (event) => {
-        const file = event.target.files?.[0];
-        if (file) {
-          await this.handleEntityCoverFile(file);
-        }
-        this.state.coverUploadContext = null;
-        entityCoverInput.value = '';
-      });
-    }
-
     const coverShell = document.getElementById('project-cover-shell');
     const coverUpload = document.getElementById('project-cover-upload');
     if (coverShell && coverUpload) {
@@ -741,7 +750,12 @@ const ProjectPage = {
     );
     if (updateError) {
       console.error('Erro ao salvar capa', updateError);
-      App.showToast('Não foi possível salvar a capa. Tente novamente.');
+      const baseMsg =
+        updateError.code === 'PGRST204'
+          ? updateError.message || 'Sua tabela não possui as colunas cover_path/cover_url ainda. Crie no Supabase e recarregue.'
+          : 'Não foi possível salvar a capa. Tente novamente.';
+      const hint = uploadData ? ' A imagem foi enviada, mas não ficou vinculada ao registro.' : '';
+      App.showToast(`${baseMsg}${hint}`);
       return;
     }
 
@@ -754,96 +768,6 @@ const ProjectPage = {
       cover_path: newCoverPath
     };
     await ProjectUI.renderProjectDetail(this.state.project);
-    App.showToast('Capa atualizada.');
-  },
-
-  openCoverPicker(entityType, entityId) {
-    const input = document.getElementById('entity-cover-upload');
-    if (!input) {
-      console.error('Input file de capas de cômodo não encontrado.');
-      return;
-    }
-    this.state.coverUploadContext = { entityType, entityId };
-    input.click();
-  },
-
-  async handleEntityCoverFile(file) {
-    if (!file) return;
-    const ctx = this.state.coverUploadContext;
-    if (!ctx || !ctx.entityType || !ctx.entityId) {
-      console.warn('Contexto de upload de capa ausente ou inválido.', ctx);
-      return;
-    }
-    const userId = App.state.user?.id;
-    const projectId = this.state.project?.id || this.state.projectId;
-    if (!userId || !projectId) {
-      App.showToast('Sessão expirada. Faça login novamente.');
-      return;
-    }
-
-    App.showToast('Enviando capa...');
-    const { data: uploadData, error: uploadError } = await DB.uploadHomeCover({
-      userId,
-      projectId,
-      entityType: ctx.entityType,
-      entityId: ctx.entityId,
-      file
-    });
-    if (uploadError || !uploadData) {
-      console.error('Erro ao enviar capa', uploadError);
-      App.showToast('Erro ao enviar capa. Tente novamente.');
-      return;
-    }
-
-    const persistCover = async () => {
-      if (ctx.entityType === 'areas') {
-        return DB.updateAreaCover(ctx.entityId, uploadData.cover_path, uploadData.cover_url);
-      }
-      if (ctx.entityType === 'subareas') {
-        return DB.updateSubareaCover(ctx.entityId, uploadData.cover_path, uploadData.cover_url);
-      }
-      return DB.updateCornerCover(ctx.entityId, uploadData.cover_path, uploadData.cover_url);
-    };
-
-    const { data: updated, error: updateError } = await persistCover();
-    if (updateError) {
-      console.error('Erro ao salvar dados da capa', updateError);
-      App.showToast('Não foi possível salvar a capa. Tente novamente.');
-      return;
-    }
-
-    const mergedPayload = updated || { cover_path: uploadData.cover_path, cover_url: uploadData.cover_url };
-
-    if (ctx.entityType === 'areas') {
-      this.state.areas = this.state.areas.map((a) =>
-        String(a.id) === String(ctx.entityId)
-          ? { ...a, ...mergedPayload, cover_path: uploadData.cover_path, cover_url: uploadData.cover_url }
-          : a
-      );
-      ProjectUI.renderAreas(this.state.areas);
-      this.state.areas.forEach((area) => ProjectUI.renderSubAreas(area.id, this.state.subAreas, this.state.corners));
-    } else if (ctx.entityType === 'subareas') {
-      this.state.subAreas = this.state.subAreas.map((sa) =>
-        String(sa.id) === String(ctx.entityId)
-          ? { ...sa, ...mergedPayload, cover_path: uploadData.cover_path, cover_url: uploadData.cover_url }
-          : sa
-      );
-      const parentAreaId = (mergedPayload && mergedPayload.area_id) || this.findAreaIdBySubArea(ctx.entityId);
-      ProjectUI.renderSubAreas(parentAreaId, this.state.subAreas, this.state.corners);
-    } else if (ctx.entityType === 'corners') {
-      this.state.corners = this.state.corners.map((c) =>
-        String(c.id) === String(ctx.entityId)
-          ? { ...c, ...mergedPayload, cover_path: uploadData.cover_path, cover_url: uploadData.cover_url }
-          : c
-      );
-      const parentSubAreaId = mergedPayload?.sub_area_id || this.state.corners.find((c) => String(c.id) === String(ctx.entityId))?.sub_area_id;
-      const parentAreaId = this.findAreaIdBySubArea(parentSubAreaId);
-      if (parentSubAreaId) {
-        ProjectUI.renderSubAreas(parentAreaId, this.state.subAreas, this.state.corners);
-      }
-    }
-
-    this.state.coverUploadContext = null;
     App.showToast('Capa atualizada.');
   },
 
