@@ -243,8 +243,10 @@
   <script src="js/db.js"></script>
   <script src="js/project.js"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-      await ProjectPage.init();
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.ProjectPage?.init) {
+        window.ProjectPage.init();
+      }
     });
   </script>
 </body>
