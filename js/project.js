@@ -136,6 +136,15 @@ function computeBudgetIndicators(tasks) {
   return { sumExpected, sumReal, isOverBudget: sumReal > sumExpected };
 }
 
+const BRL_FORMATTER = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+function formatCurrencyBRL(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) return null;
+  return BRL_FORMATTER.format(parsed);
+}
+
 function loadPointsLedger(userId, projectId) {
   const key = `msh_points_${userId}_${projectId}`;
   try {
@@ -210,22 +219,21 @@ const ProjectUI = {
     const typeEl = document.getElementById('project-type');
     const periodEl = document.getElementById('project-period');
     const budgetEl = document.getElementById('project-budget');
-    const metaEl = document.getElementById('project-meta');
     const coverImg = document.getElementById('project-cover-img');
     const coverShell = document.getElementById('project-cover-shell');
     const coverOverlayText = document.getElementById('project-cover-placeholder-text');
-    if (!project || !nameEl || !typeEl || !periodEl || !budgetEl || !metaEl) return;
+    if (!project || !nameEl || !typeEl || !periodEl || !budgetEl) return;
 
     nameEl.textContent = project.name;
     typeEl.textContent = `${project.home_type || 'Tipo'} · ${project.mode || 'macro'}`;
     periodEl.textContent = ProjectDomain.formatPeriod(project.start_date, project.end_date);
-    budgetEl.textContent = project.budget_expected
-      ? `Budget planejado R$ ${project.budget_expected}`
-      : 'Budget não definido';
-    metaEl.innerHTML = `
-      <span class="pill">Progresso ${ProjectDomain.placeholderProgress()}%</span>
-      <span class="pill outline">Budget real ${project.budget_real || 0}</span>
-    `;
+    const formattedBudget = formatCurrencyBRL(project.budget_expected);
+    budgetEl.textContent = formattedBudget ? `Budget planejado ${formattedBudget}` : 'Budget não definido';
+    ProjectUI.renderHeroIndicators({
+      progressPercent: null,
+      budgetExpected: project.budget_expected,
+      budgetReal: project.budget_real
+    });
 
     if (coverImg) {
       coverImg.alt = `Capa do projeto ${project.name || ''}`.trim();
@@ -246,6 +254,42 @@ const ProjectUI = {
     if (coverOverlayText) {
       coverOverlayText.textContent = isPlaceholder ? 'Imagem placeholder' : 'Clique para trocar a capa';
     }
+  },
+
+  renderHeroIndicators({ progressPercent, budgetExpected, budgetReal } = {}) {
+    const meta = document.getElementById('project-meta');
+    if (!meta) return;
+    const hasProgress = typeof progressPercent === 'number' && !Number.isNaN(progressPercent);
+    const cappedProgress = hasProgress ? Math.min(Math.max(progressPercent, 0), 100) : 0;
+    const progressLabel = hasProgress ? `${progressPercent}%` : '—';
+    const formattedExpected = formatCurrencyBRL(budgetExpected);
+    const formattedReal = formatCurrencyBRL(budgetReal);
+    const plannedLabel = formattedExpected || '—';
+
+    meta.innerHTML = `
+      <article class="indicator-card">
+        <div class="indicator-header">
+          <p class="eyebrow">Progresso</p>
+        </div>
+        <div class="indicator-track">
+          <div class="indicator-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${cappedProgress}">
+            <span style="width: ${cappedProgress}%"></span>
+          </div>
+          <span class="indicator-chip">${progressLabel}</span>
+        </div>
+        <p class="muted small">Avanço das tarefas concluídas</p>
+      </article>
+      <article class="indicator-card">
+        <div class="indicator-header">
+          <p class="eyebrow">Budget</p>
+          <span class="indicator-value">${plannedLabel}</span>
+        </div>
+        <div class="indicator-meta muted small">
+          <span>Planejado ${formattedExpected ? formattedExpected : '—'}</span>
+          ${formattedReal ? `<span>Real ${formattedReal}</span>` : ''}
+        </div>
+      </article>
+    `;
   },
 
   renderAreas(areas) {
@@ -726,6 +770,11 @@ const ProjectPage = {
     const points = computeProjectPoints(tasks);
     const deadlines = computeDeadlineIndicators(this.state.project, tasks);
     const budget = computeBudgetIndicators(tasks);
+    ProjectUI.renderHeroIndicators({
+      progressPercent: progress.progressPercent,
+      budgetExpected: this.state.project?.budget_expected,
+      budgetReal: this.state.project?.budget_real
+    });
 
     const cards = [
       { label: 'Progresso do projeto', value: `${progress.progressPercent}%`, caption: `Peso total ${progress.W}` },
