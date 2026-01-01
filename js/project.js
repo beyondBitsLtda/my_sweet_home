@@ -1673,3 +1673,16 @@ document.addEventListener('submit', async (event) => {
   }
 
 });
+
+// Exposição global para compatibilidade com chamadas inline.
+(() => {
+  const initProjectPage = (...args) => ProjectPage.init(...args);
+  window.ProjectPage = window.ProjectPage || ProjectPage;
+  if (!window.ProjectPage.init) {
+    window.ProjectPage.init = initProjectPage;
+  }
+  if (!window.initProjectPage) {
+    window.initProjectPage = initProjectPage;
+  }
+  window.dispatchEvent(new Event('ProjectPageReady'));
+})();

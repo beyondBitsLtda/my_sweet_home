@@ -250,7 +250,32 @@
   <script src="js/project.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
-      await ProjectPage.init();
+      const tryInit = async () => {
+        const initializer = window.ProjectPage?.init || window.initProjectPage;
+        if (typeof initializer === 'function') {
+          await initializer();
+          return true;
+        }
+        return false;
+      };
+
+      if (await tryInit()) return;
+
+      const onReady = async () => {
+        if (await tryInit()) {
+          window.removeEventListener('ProjectPageReady', onReady);
+        }
+      };
+      window.addEventListener('ProjectPageReady', onReady);
+
+      setTimeout(async () => {
+        const initialized = await tryInit();
+        if (initialized) {
+          window.removeEventListener('ProjectPageReady', onReady);
+          return;
+        }
+        console.error('Initializer não encontrado: defina ProjectPage.init ou initProjectPage.');
+      }, 50);
     });
   </script>
 </body>
