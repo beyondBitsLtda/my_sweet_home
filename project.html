@@ -30,17 +30,25 @@
 
   <main class="container" id="projectUI" data-project-ui>
     <section class="section">
-      <div class="card hero">
-        <div>
+      <div class="card hero project-hero">
+        <div class="project-hero-content">
           <p class="eyebrow" id="project-type">Projeto</p>
           <h1 id="project-name">Carregando projeto...</h1>
           <p class="muted" id="project-period">—</p>
           <p class="muted" id="project-budget">—</p>
+          <div class="pill-row" id="project-meta">
+            <span class="pill">Progresso 72%</span>
+            <span class="pill outline">Budget</span>
+          </div>
         </div>
-        <div class="pill-row" id="project-meta">
-          <span class="pill">Progresso 72%</span>
-          <span class="pill outline">Budget</span>
+        <div class="project-hero-cover cover-frame is-hero is-clickable" id="project-cover-shell">
+          <img class="hero-cover cover-img hidden" id="project-cover-img" loading="lazy" alt="Capa do projeto" />
+          <div class="cover-overlay" id="project-cover-overlay">
+            <span class="cover-overlay__text" id="project-cover-placeholder-text">Imagem placeholder</span>
+            <span class="cover-overlay__text subtle">Clique para trocar a capa</span>
+          </div>
         </div>
+        <input type="file" class="hidden" id="project-cover-upload" accept="image/*" />
       </div>
 
       <div class="tabs" role="tablist">
@@ -229,8 +237,10 @@
   <script src="js/db.js"></script>
   <script src="js/project.js"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-      await ProjectPage.init();
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.ProjectPage?.init) {
+        window.ProjectPage.init();
+      }
     });
   </script>
 </body>

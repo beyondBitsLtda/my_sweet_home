@@ -313,6 +313,40 @@ const DB = (() => {
     return supabase.from('projects').select('*').eq('id', id).single();
   }
 
+  async function requireAuthOrRedirect() {
+    const supabase = initSupabase();
+    let session = null;
+    let sessionError = null;
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      sessionError = error || null;
+      session = data?.session || null;
+      if (sessionError) {
+        console.warn('[auth] getSession error', sessionError);
+      }
+    } catch (err) {
+      sessionError = err;
+      console.warn('[auth] getSession exception', err);
+    }
+
+    const shouldInvalidate =
+      sessionError?.status === 400 ||
+      sessionError?.message?.toLowerCase?.().includes('refresh_token') ||
+      !session;
+
+    if (shouldInvalidate) {
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutErr) {
+        console.warn('[auth] signOut after invalid session failed', signOutErr);
+      }
+      window.location.href = 'index.html';
+      return { session: null, error: sessionError, expired: true };
+    }
+
+    return { session, error: sessionError, expired: false };
+  }
+
   // ---------------------------
   // CRUD de áreas (cômodos) — V1
   // ---------------------------
@@ -342,6 +376,23 @@ const DB = (() => {
     const supabase = initSupabase();
     console.info('updateArea', areaId, patch);
     return supabase.from('areas').update(patch).eq('id', areaId).select().single();
+  }
+
+  async function updateAreaCover(areaId, coverUrl, coverPath) {
+    const supabase = initSupabase();
+    const payload = {};
+    if (typeof coverUrl !== 'undefined') payload.cover_url = coverUrl;
+    if (typeof coverPath !== 'undefined') payload.cover_path = coverPath;
+    const { data, error } = await supabase.from('areas').update(payload).eq('id', areaId).select().single();
+    if (error) {
+      if (error.code === 'PGRST204') {
+        const friendly = new Error('Sua tabela não possui as colunas cover_path/cover_url ainda. Crie no Supabase e recarregue.');
+        friendly.code = error.code;
+        return { data: null, error: friendly };
+      }
+      return { data: null, error };
+    }
+    return { data, error: null };
   }
 
   async function deleteArea(areaId) {
@@ -375,6 +426,23 @@ const DB = (() => {
     return supabase.from('sub_areas').update(patch).eq('id', subAreaId).select().single();
   }
 
+  async function updateSubAreaCover(subAreaId, coverUrl, coverPath) {
+    const supabase = initSupabase();
+    const payload = {};
+    if (typeof coverUrl !== 'undefined') payload.cover_url = coverUrl;
+    if (typeof coverPath !== 'undefined') payload.cover_path = coverPath;
+    const { data, error } = await supabase.from('sub_areas').update(payload).eq('id', subAreaId).select().single();
+    if (error) {
+      if (error.code === 'PGRST204') {
+        const friendly = new Error('Sua tabela não possui as colunas cover_path/cover_url ainda. Crie no Supabase e recarregue.');
+        friendly.code = error.code;
+        return { data: null, error: friendly };
+      }
+      return { data: null, error };
+    }
+    return { data, error: null };
+  }
+
   async function deleteSubArea(subAreaId) {
     const supabase = initSupabase();
     console.info('deleteSubArea', subAreaId);
@@ -404,6 +472,23 @@ const DB = (() => {
     const supabase = initSupabase();
     console.info('updateCorner', cornerId, patch);
     return supabase.from('corners').update(patch).eq('id', cornerId).select().single();
+  }
+
+  async function updateCornerCover(cornerId, coverUrl, coverPath) {
+    const supabase = initSupabase();
+    const payload = {};
+    if (typeof coverUrl !== 'undefined') payload.cover_url = coverUrl;
+    if (typeof coverPath !== 'undefined') payload.cover_path = coverPath;
+    const { data, error } = await supabase.from('corners').update(payload).eq('id', cornerId).select().single();
+    if (error) {
+      if (error.code === 'PGRST204') {
+        const friendly = new Error('Sua tabela não possui as colunas cover_path/cover_url ainda. Crie no Supabase e recarregue.');
+        friendly.code = error.code;
+        return { data: null, error: friendly };
+      }
+      return { data: null, error };
+    }
+    return { data, error: null };
   }
 
   async function deleteCorner(cornerId) {
@@ -570,6 +655,7 @@ const DB = (() => {
     updateProjectCover,
     getSignedProjectCoverUrl,
     getProjectCoverUrl,
+    requireAuthOrRedirect,
     onAuthStateChange,
     upsertProfile,
     createProject,
@@ -579,14 +665,17 @@ const DB = (() => {
     createArea,
     listAreasByProject,
     updateArea,
+    updateAreaCover,
     deleteArea,
     createSubArea,
     listSubAreasByArea,
     updateSubArea,
+    updateSubAreaCover,
     deleteSubArea,
     createCorner,
     listCornersBySubArea,
     updateCorner,
+    updateCornerCover,
     deleteCorner,
     createTask,
     updateTask,

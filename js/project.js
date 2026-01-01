@@ -36,7 +36,7 @@ const ProjectDomain = {
     }
     return 'Selecione um escopo';
   }
-};
+});
 
 // Mapeamento único de status: garante que UI/back-end usem os mesmos valores aceitos pelo banco.
 // Sempre normalizeStatus antes de gravar no Supabase.
@@ -205,12 +205,15 @@ const ProjectUI = {
     container.innerHTML = cards + locked;
   },
 
-  renderProjectDetail(project) {
+  async renderProjectDetail(project) {
     const nameEl = document.getElementById('project-name');
     const typeEl = document.getElementById('project-type');
     const periodEl = document.getElementById('project-period');
     const budgetEl = document.getElementById('project-budget');
     const metaEl = document.getElementById('project-meta');
+    const coverImg = document.getElementById('project-cover-img');
+    const coverShell = document.getElementById('project-cover-shell');
+    const coverOverlayText = document.getElementById('project-cover-placeholder-text');
     if (!project || !nameEl || !typeEl || !periodEl || !budgetEl || !metaEl) return;
 
     nameEl.textContent = project.name;
@@ -223,6 +226,26 @@ const ProjectUI = {
       <span class="pill">Progresso ${ProjectDomain.placeholderProgress()}%</span>
       <span class="pill outline">Budget real ${project.budget_real || 0}</span>
     `;
+
+    if (coverImg) {
+      coverImg.alt = `Capa do projeto ${project.name || ''}`.trim();
+      let coverSrc = project.cover_url || null;
+      if (!coverSrc && project.cover_path) {
+        coverSrc = await DB.getProjectCoverUrl(project);
+      }
+      if (!coverSrc) {
+        coverSrc = 'assets/img/project_placeholder.webp';
+      }
+      coverImg.src = coverSrc;
+      coverImg.classList.remove('hidden');
+    }
+    const isPlaceholder = !project.cover_url && !project.cover_path;
+    if (coverShell) {
+      coverShell.classList.toggle('is-placeholder', isPlaceholder);
+    }
+    if (coverOverlayText) {
+      coverOverlayText.textContent = isPlaceholder ? 'Imagem placeholder' : 'Clique para trocar a capa';
+    }
   },
 
   renderAreas(areas) {
@@ -476,7 +499,7 @@ const ProjectUI = {
 /**
  * Fluxos específicos da página de projeto (detalhe).
  */
-const ProjectPage = {
+const ProjectPage = (window.ProjectPage = window.ProjectPage || {
   state: {
     projectId: null,
     project: null,
@@ -499,49 +522,82 @@ const ProjectPage = {
   },
 
   async init() {
-    await App.requireAuth();
-    const projectId = new URLSearchParams(window.location.search).get('id');
-    this.state.projectId = projectId;
-    const projectUI = document.querySelector('#projectUI') || document.querySelector('[data-project-ui]');
-    if (!projectUI) {
-      console.error('Container do projeto não encontrado (#projectUI).');
-      return;
+    try {
+      const auth = await DB.requireAuthOrRedirect();
+      if (auth?.expired) {
+        App.showToast('Sua sessão expirou, faça login novamente.');
+        return;
+      }
+      if (!auth?.session) return;
+
+      const projectId = new URLSearchParams(window.location.search).get('id');
+      this.state.projectId = projectId;
+      const projectUI = document.querySelector('#projectUI') || document.querySelector('[data-project-ui]');
+      if (!projectUI) {
+        console.error('Container do projeto não encontrado (#projectUI).');
+        return;
+      }
+
+      if (!projectId) {
+        projectUI.innerHTML = `
+          <div class="card">
+            <p class="eyebrow">Projeto inválido</p>
+            <h3>Projeto inválido ou link incompleto</h3>
+            <p class="muted">Reabra a partir da lista de projetos.</p>
+            <a class="btn primary" href="app.html">Voltar para projetos</a>
+          </div>`;
+        return;
+      }
+
+      const { data: project, error } = await DB.getProjectById(projectId);
+      if (error || !project) {
+        console.error('Erro ao carregar projeto', error);
+        projectUI.innerHTML = `
+          <div class="card">
+            <p class="eyebrow">Erro</p>
+            <h3>Não foi possível carregar o projeto</h3>
+            <p class="muted">Tente novamente ou volte para projetos.</p>
+            <a class="btn primary" href="app.html">Voltar para projetos</a>
+          </div>`;
+        return;
+      }
+
+      this.state.project = project;
+      await ProjectUI.renderProjectDetail(project);
+
+      await this.loadAreas(projectId);
+      await this.hydrateSubAreasAndCorners();
+      this.bootstrapScope();
+      await this.loadTasks(projectId);
+      this.bindAreaForm(projectId);
+      this.bindTaskForm(projectId);
+      this.bindScopeSelectors();
+
+      const coverShell = document.getElementById('project-cover-shell');
+      const coverUpload = document.getElementById('project-cover-upload');
+      if (coverShell && coverUpload) {
+        coverShell.addEventListener('click', () => coverUpload.click());
+        coverUpload.addEventListener('change', async (event) => {
+          const file = event.target.files?.[0];
+          if (file) {
+            await this.handleCoverChange(file);
+            coverUpload.value = '';
+          }
+        });
+      }
+    } catch (err) {
+      console.error('[ProjectPage.init] error', err);
+      const projectUI = document.querySelector('#projectUI') || document.querySelector('[data-project-ui]');
+      if (projectUI) {
+        projectUI.innerHTML = `
+          <div class="card">
+            <p class="eyebrow">Erro</p>
+            <h3>Falha ao carregar</h3>
+            <p class="muted">Tente novamente ou volte para projetos.</p>
+            <a class="btn primary" href="app.html">Voltar para projetos</a>
+          </div>`;
+      }
     }
-
-    if (!projectId) {
-      projectUI.innerHTML = `
-        <div class="card">
-          <p class="eyebrow">Projeto inválido</p>
-          <h3>Projeto inválido ou link incompleto</h3>
-          <p class="muted">Reabra a partir da lista de projetos.</p>
-          <a class="btn primary" href="app.html">Voltar para projetos</a>
-        </div>`;
-      return;
-    }
-
-    const { data: project, error } = await DB.getProjectById(projectId);
-    if (error || !project) {
-      console.error('Erro ao carregar projeto', error);
-      projectUI.innerHTML = `
-        <div class="card">
-          <p class="eyebrow">Erro</p>
-          <h3>Não foi possível carregar o projeto</h3>
-          <p class="muted">Tente novamente ou volte para projetos.</p>
-          <a class="btn primary" href="app.html">Voltar para projetos</a>
-        </div>`;
-      return;
-    }
-
-    this.state.project = project;
-    ProjectUI.renderProjectDetail(project);
-
-    await this.loadAreas(projectId);
-    await this.hydrateSubAreasAndCorners();
-    this.bootstrapScope();
-    await this.loadTasks(projectId);
-    this.bindAreaForm(projectId);
-    this.bindTaskForm(projectId);
-    this.bindScopeSelectors();
   },
 
   async loadProject(projectId) {
@@ -552,7 +608,52 @@ const ProjectPage = {
       return;
     }
     this.state.project = data;
-    ProjectUI.renderProjectDetail(data);
+    await ProjectUI.renderProjectDetail(data);
+  },
+
+  async handleCoverChange(file) {
+    if (!file) return;
+    const userId = App.state.user?.id;
+    const projectId = this.state.project?.id || this.state.projectId;
+    if (!userId || !projectId) {
+      App.showToast('Não foi possível identificar o projeto.');
+      return;
+    }
+    const prev = { ...this.state.project };
+    const { data: uploadData, error: uploadError } = await DB.uploadProjectCover(userId, projectId, file);
+    if (uploadError || !uploadData) {
+      console.error('Erro ao enviar capa', uploadError);
+      App.showToast('Não foi possível enviar a capa. Tente novamente.');
+      return;
+    }
+
+    const { data: updated, error: updateError } = await DB.updateProjectCover(
+      projectId,
+      userId,
+      uploadData.cover_url,
+      uploadData.cover_path
+    );
+    if (updateError) {
+      console.error('Erro ao salvar capa', updateError);
+      const baseMsg =
+        updateError.code === 'PGRST204'
+          ? updateError.message || 'Sua tabela não possui as colunas cover_path/cover_url ainda. Crie no Supabase e recarregue.'
+          : 'Não foi possível salvar a capa. Tente novamente.';
+      const hint = uploadData ? ' A imagem foi enviada, mas não ficou vinculada ao registro.' : '';
+      App.showToast(`${baseMsg}${hint}`);
+      return;
+    }
+
+    const newCoverUrl = updated?.cover_url || uploadData.cover_url || null;
+    const newCoverPath = updated?.cover_path || uploadData.cover_path || null;
+    this.state.project = {
+      ...prev,
+      ...updated,
+      cover_url: newCoverUrl,
+      cover_path: newCoverPath
+    };
+    await ProjectUI.renderProjectDetail(this.state.project);
+    App.showToast('Capa atualizada.');
   },
 
   async loadAreas(projectId) {
