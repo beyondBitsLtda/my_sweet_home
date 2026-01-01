@@ -43,8 +43,58 @@
       </div>
     </section>
 
+    <section class="section" aria-labelledby="home-type-title">
+      <div class="card soft-card">
+        <p class="eyebrow">Seleção</p>
+        <div class="section-header compact">
+          <div>
+            <h2 id="home-type-title">Escolha o tipo de moradia</h2>
+            <p class="muted">Selecione para continuar. Apenas apartamento está habilitado nesta versão.</p>
+          </div>
+        </div>
+
+        <div class="home-type-grid" id="homeTypeGrid">
+          <button class="home-card" type="button" data-home-type="apartment" aria-pressed="false">
+            <div class="home-card__media">
+              <img src="assets/img/home_apartment.webp" loading="lazy" alt="Apartamento contemporâneo" />
+              <span class="badge ghost home-card__label hidden" data-selected-label>Selecionado</span>
+            </div>
+            <div class="home-card__content">
+              <p class="eyebrow">Apartamento</p>
+              <h3>Ambientes integrados e soluções inteligentes</h3>
+              <p class="muted">Projetos para unidades residenciais em prédios, com ambientes internos e áreas privativas.</p>
+            </div>
+          </button>
+
+          <div class="home-card is-disabled" data-home-type="house" role="button" aria-disabled="true" tabindex="-1">
+            <div class="home-card__media">
+              <img src="assets/img/home_house.webp" loading="lazy" alt="Casa com fachada clean" />
+              <span class="badge outline home-card__pill">Em breve</span>
+            </div>
+            <div class="home-card__content">
+              <p class="eyebrow">Casa</p>
+              <h3>Espaços amplos e varanda para inspirar</h3>
+              <p class="muted">Projetos para residências independentes, com ambientes internos e áreas externas.</p>
+            </div>
+          </div>
+
+          <div class="home-card is-disabled" data-home-type="farm" role="button" aria-disabled="true" tabindex="-1">
+            <div class="home-card__media">
+              <img src="assets/img/home_farm.webp" loading="lazy" alt="Sítio com área verde" />
+              <span class="badge outline home-card__pill">Em breve</span>
+            </div>
+            <div class="home-card__content">
+              <p class="eyebrow">Sítio</p>
+              <h3>Refúgio natural com charme editorial</h3>
+              <p class="muted">Projetos para propriedades rurais, com áreas amplas, plantio e criação.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="section">
-      <div class="card">
+      <div class="card hidden" id="createProjectCard">
         <p class="eyebrow">Criar novo</p>
         <h2>Comece um novo apartamento</h2>
         <form class="auth-form" id="createProjectForm">
@@ -73,7 +123,7 @@
           <label class="muted" for="budgetExpected">Budget planejado</label>
           <input class="input" type="number" id="budgetExpected" name="budget_expected" placeholder="30000" />
 
-          <label class="muted" for "budgetReal">Budget real</label>
+          <label class="muted" for="budgetReal">Budget real</label>
           <input class="input" type="number" id="budgetReal" name="budget_real" placeholder="0" />
 
           <label class="muted" for="projectCoverInput">Foto do projeto (capa)</label>
