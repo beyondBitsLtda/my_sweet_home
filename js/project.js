@@ -655,66 +655,7 @@ const ProjectPage = {
     }
   },
 
-  async init() {
-    await App.requireAuth();
-    const projectId = new URLSearchParams(window.location.search).get('id');
-    this.state.projectId = projectId;
-    const projectUI = document.querySelector('#projectUI') || document.querySelector('[data-project-ui]');
-    if (!projectUI) {
-      console.error('Container do projeto não encontrado (#projectUI).');
-      return;
-    }
-
-    if (!projectId) {
-      projectUI.innerHTML = `
-        <div class="card">
-          <p class="eyebrow">Projeto inválido</p>
-          <h3>Projeto inválido ou link incompleto</h3>
-          <p class="muted">Reabra a partir da lista de projetos.</p>
-          <a class="btn primary" href="app.html">Voltar para projetos</a>
-        </div>`;
-      return;
-    }
-
-    const { data: project, error } = await DB.getProjectById(projectId);
-    if (error || !project) {
-      console.error('Erro ao carregar projeto', error);
-      projectUI.innerHTML = `
-        <div class="card">
-          <p class="eyebrow">Erro</p>
-          <h3>Não foi possível carregar o projeto</h3>
-          <p class="muted">Tente novamente ou volte para projetos.</p>
-          <a class="btn primary" href="app.html">Voltar para projetos</a>
-        </div>`;
-      return;
-    }
-
-    this.state.project = project;
-    await ProjectUI.renderProjectDetail(project);
-
-    await this.loadAreas(projectId);
-    await this.hydrateSubAreasAndCorners();
-    this.bootstrapScope();
-    await this.loadTasks(projectId);
-    this.bindAreaForm(projectId);
-    this.bindTaskForm(projectId);
-    this.bindAddRoomCard();
-    this.bindScopeSelectors();
-
-    const coverShell = document.getElementById('project-cover-shell');
-    const coverUpload = document.getElementById('project-cover-upload');
-    if (coverShell && coverUpload) {
-      coverShell.addEventListener('click', () => coverUpload.click());
-      coverUpload.addEventListener('change', async (event) => {
-        const file = event.target.files?.[0];
-        if (file) {
-          await this.handleCoverChange(file);
-          coverUpload.value = '';
-        }
-      });
-    }
-  },
-
+  init: initProjectPage,
   async loadProject(projectId) {
     const { data, error } = await DB.getProjectById(projectId);
     if (error || !data) {
@@ -768,6 +709,96 @@ const ProjectPage = {
       cover_path: newCoverPath
     };
     await ProjectUI.renderProjectDetail(this.state.project);
+    App.showToast('Capa atualizada.');
+  },
+
+  openCoverPicker(entityType, entityId) {
+    const input = document.getElementById('entity-cover-upload');
+    if (!input) {
+      console.error('Input file de capas de cômodo não encontrado.');
+      return;
+    }
+    this.state.coverUploadContext = { entityType, entityId };
+    input.click();
+  },
+
+  async handleEntityCoverFile(file) {
+    if (!file) return;
+    const ctx = this.state.coverUploadContext;
+    if (!ctx || !ctx.entityType || !ctx.entityId) {
+      console.warn('Contexto de upload de capa ausente ou inválido.', ctx);
+      return;
+    }
+    const userId = App.state.user?.id;
+    const projectId = this.state.project?.id || this.state.projectId;
+    if (!userId || !projectId) {
+      App.showToast('Sessão expirada. Faça login novamente.');
+      return;
+    }
+
+    App.showToast('Enviando capa...');
+    const { data: uploadData, error: uploadError } = await DB.uploadHomeCover({
+      userId,
+      projectId,
+      entityType: ctx.entityType,
+      entityId: ctx.entityId,
+      file
+    });
+    if (uploadError || !uploadData) {
+      console.error('Erro ao enviar capa', uploadError);
+      App.showToast('Erro ao enviar capa. Tente novamente.');
+      return;
+    }
+
+    const persistCover = async () => {
+      if (ctx.entityType === 'areas') {
+        return DB.updateAreaCover(ctx.entityId, uploadData.cover_path, uploadData.cover_url);
+      }
+      if (ctx.entityType === 'subareas') {
+        return DB.updateSubareaCover(ctx.entityId, uploadData.cover_path, uploadData.cover_url);
+      }
+      return DB.updateCornerCover(ctx.entityId, uploadData.cover_path, uploadData.cover_url);
+    };
+
+    const { data: updated, error: updateError } = await persistCover();
+    if (updateError) {
+      console.error('Erro ao salvar dados da capa', updateError);
+      App.showToast('Não foi possível salvar a capa. Tente novamente.');
+      return;
+    }
+
+    const mergedPayload = updated || { cover_path: uploadData.cover_path, cover_url: uploadData.cover_url };
+
+    if (ctx.entityType === 'areas') {
+      this.state.areas = this.state.areas.map((a) =>
+        String(a.id) === String(ctx.entityId)
+          ? { ...a, ...mergedPayload, cover_path: uploadData.cover_path, cover_url: uploadData.cover_url }
+          : a
+      );
+      ProjectUI.renderAreas(this.state.areas);
+      this.state.areas.forEach((area) => ProjectUI.renderSubAreas(area.id, this.state.subAreas, this.state.corners));
+    } else if (ctx.entityType === 'subareas') {
+      this.state.subAreas = this.state.subAreas.map((sa) =>
+        String(sa.id) === String(ctx.entityId)
+          ? { ...sa, ...mergedPayload, cover_path: uploadData.cover_path, cover_url: uploadData.cover_url }
+          : sa
+      );
+      const parentAreaId = (mergedPayload && mergedPayload.area_id) || this.findAreaIdBySubArea(ctx.entityId);
+      ProjectUI.renderSubAreas(parentAreaId, this.state.subAreas, this.state.corners);
+    } else if (ctx.entityType === 'corners') {
+      this.state.corners = this.state.corners.map((c) =>
+        String(c.id) === String(ctx.entityId)
+          ? { ...c, ...mergedPayload, cover_path: uploadData.cover_path, cover_url: uploadData.cover_url }
+          : c
+      );
+      const parentSubAreaId = mergedPayload?.sub_area_id || this.state.corners.find((c) => String(c.id) === String(ctx.entityId))?.sub_area_id;
+      const parentAreaId = this.findAreaIdBySubArea(parentSubAreaId);
+      if (parentSubAreaId) {
+        ProjectUI.renderSubAreas(parentAreaId, this.state.subAreas, this.state.corners);
+      }
+    }
+
+    this.state.coverUploadContext = null;
     App.showToast('Capa atualizada.');
   },
 
@@ -1482,6 +1513,84 @@ const ProjectPage = {
   }
 };
 
+async function initProjectPage() {
+  const page = ProjectPage;
+  try {
+    await App.requireAuth();
+    const projectId = new URLSearchParams(window.location.search).get('id');
+    page.state.projectId = projectId;
+    const projectUI = document.querySelector('#projectUI') || document.querySelector('[data-project-ui]');
+    if (!projectUI) {
+      console.error('Container do projeto não encontrado (#projectUI).');
+      return;
+    }
+
+    if (!projectId) {
+      projectUI.innerHTML = `
+        <div class="card">
+          <p class="eyebrow">Projeto inválido</p>
+          <h3>Projeto inválido ou link incompleto</h3>
+          <p class="muted">Reabra a partir da lista de projetos.</p>
+          <a class="btn primary" href="app.html">Voltar para projetos</a>
+        </div>`;
+      return;
+    }
+
+    const { data: project, error } = await DB.getProjectById(projectId);
+    if (error || !project) {
+      console.error('Erro ao carregar projeto', error);
+      projectUI.innerHTML = `
+        <div class="card">
+          <p class="eyebrow">Erro</p>
+          <h3>Não foi possível carregar o projeto</h3>
+          <p class="muted">Tente novamente ou volte para projetos.</p>
+          <a class="btn primary" href="app.html">Voltar para projetos</a>
+        </div>`;
+      return;
+    }
+
+    page.state.project = project;
+    await ProjectUI.renderProjectDetail(project);
+
+    await page.loadAreas(projectId);
+    await page.hydrateSubAreasAndCorners();
+    page.bootstrapScope();
+    await page.loadTasks(projectId);
+    page.bindAreaForm(projectId);
+    page.bindTaskForm(projectId);
+    page.bindAddRoomCard();
+    page.bindScopeSelectors();
+
+    const entityCoverInput = document.getElementById('entity-cover-upload');
+    if (entityCoverInput) {
+      entityCoverInput.addEventListener('change', async (event) => {
+        const file = event.target.files?.[0];
+        if (file) {
+          await page.handleEntityCoverFile(file);
+        }
+        page.state.coverUploadContext = null;
+        entityCoverInput.value = '';
+      });
+    }
+
+    const coverShell = document.getElementById('project-cover-shell');
+    const coverUpload = document.getElementById('project-cover-upload');
+    if (coverShell && coverUpload) {
+      coverShell.addEventListener('click', () => coverUpload.click());
+      coverUpload.addEventListener('change', async (event) => {
+        const file = event.target.files?.[0];
+        if (file) {
+          await page.handleCoverChange(file);
+          coverUpload.value = '';
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao inicializar página do projeto', error);
+    App.showToast('Não foi possível carregar o projeto.');
+  }
+}
+
 // Delegação específica da página de projeto (áreas, subáreas, cantos e tarefas)
 document.addEventListener('click', async (event) => {
   const changeCoverTarget = event.target.closest('[data-action="change-cover"]');
@@ -1587,3 +1696,5 @@ document.addEventListener('submit', async (event) => {
   }
 
 });
+
+window.ProjectPage = ProjectPage;
