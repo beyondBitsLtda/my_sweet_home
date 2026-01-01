@@ -248,7 +248,7 @@ const ProjectUI = {
         coverSrc = await DB.getProjectCoverUrl(project);
       }
       if (!coverSrc) {
-        coverSrc = 'assets/img/project_placeholder.webp';
+        coverSrc = 'assets/img/project_placeholder.jpg';
       }
       coverImg.src = coverSrc;
       coverImg.classList.remove('hidden');
