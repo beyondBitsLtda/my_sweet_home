@@ -299,9 +299,20 @@ const ProjectUI = {
       return;
     }
     grid.innerHTML = areas
-      .map(
-        (area) => `
+      .map((area) => {
+        const coverSrc = area.cover_url || 'assets/img/project_placeholder.webp';
+        const isPlaceholder = !area.cover_url;
+        return `
       <article class="card area-card" data-area-id="${area.id}">
+        <div class="area-cover-shell ${isPlaceholder ? 'is-placeholder' : ''}">
+          <img
+            src="${coverSrc}"
+            alt="Capa do cômodo ${area.name}"
+            loading="lazy"
+            data-entity-cover="areas"
+            data-entity-id="${area.id}"
+          />
+        </div>
         <div class="card-top">
           <div>
             <p class="label">${area.name}</p>
@@ -332,8 +343,8 @@ const ProjectUI = {
           </form>
         </div>
       </article>
-    `
-      )
+    `;
+      })
       .join('');
   },
 
@@ -364,6 +375,15 @@ const ProjectUI = {
           .map(
             (c) => `
               <div class="nested-row">
+                <div class="corner-cover ${c.cover_url ? '' : 'is-placeholder'}">
+                  <img
+                    src="${c.cover_url || 'assets/img/project_placeholder.webp'}"
+                    alt="Capa do canto ${c.name}"
+                    loading="lazy"
+                    data-entity-cover="corners"
+                    data-entity-id="${c.id}"
+                  />
+                </div>
                 <div>
                   <p class="label">${c.name}</p>
                   <p class="muted">${c.description || 'Sem descrição'}</p>
@@ -380,6 +400,15 @@ const ProjectUI = {
 
         return `
           <article class="nested-card" data-sub-area-id="${sa.id}">
+            <div class="nested-cover ${sa.cover_url ? '' : 'is-placeholder'}">
+              <img
+                src="${sa.cover_url || 'assets/img/project_placeholder.webp'}"
+                alt="Capa da subárea ${sa.name}"
+                loading="lazy"
+                data-entity-cover="subareas"
+                data-entity-id="${sa.id}"
+              />
+            </div>
             <div class="nested-row">
               <div>
                 <p class="label">${sa.name}</p>
@@ -557,6 +586,7 @@ const ProjectPage = {
       subAreaId: null,
       cornerId: null
     },
+    entityCoverInput: null,
     photoModal: {
       taskId: null,
       beforePreview: null,
@@ -731,6 +761,120 @@ const ProjectPage = {
       subAreas: this.state.subAreas,
       corners: this.state.corners
     };
+  },
+
+  ensureEntityCoverInput() {
+    if (this.state.entityCoverInput) return this.state.entityCoverInput;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.hidden = true;
+    input.addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      const type = input.dataset.entityType;
+      const id = input.dataset.entityId;
+      if (!file || !type || !id) {
+        input.value = '';
+        return;
+      }
+      await this.handleEntityCoverUpload(type, id, file);
+      input.value = '';
+    });
+    document.body.appendChild(input);
+    this.state.entityCoverInput = input;
+    return input;
+  },
+
+  openCoverFileSelector(entityType, entityId) {
+    const input = this.ensureEntityCoverInput();
+    if (!input) return;
+    input.dataset.entityType = entityType;
+    input.dataset.entityId = entityId;
+    input.value = '';
+    input.click();
+  },
+
+  async handleEntityCoverUpload(entityType, entityId, file) {
+    if (!file) return;
+    const userId = App.state.user?.id;
+    const projectId = this.state.project?.id || this.state.projectId;
+    if (!userId || !projectId) {
+      App.showToast('Sessão expirada. Reabra o projeto.');
+      return;
+    }
+
+    const { data: uploadData, error: uploadError } = await DB.uploadEntityCover({
+      userId,
+      projectId,
+      entityType,
+      entityId,
+      file
+    });
+    if (uploadError || !uploadData) {
+      console.error('Erro ao enviar capa', uploadError);
+      App.showToast('Não foi possível enviar a capa. Tente novamente.');
+      return;
+    }
+
+    let updateResult = null;
+    const entityKey = String(entityType || '').toLowerCase();
+    if (entityKey === 'areas') {
+      updateResult = await DB.updateAreaCover(entityId, uploadData.cover_path, uploadData.cover_url);
+    } else if (entityKey === 'subareas') {
+      updateResult = await DB.updateSubareaCover(entityId, uploadData.cover_path, uploadData.cover_url);
+    } else if (entityKey === 'corners') {
+      updateResult = await DB.updateCornerCover(entityId, uploadData.cover_path, uploadData.cover_url);
+    } else {
+      App.showToast('Tipo de capa inválido.');
+      return;
+    }
+
+    if (!updateResult) return;
+    const { data, error } = updateResult;
+    if (error) {
+      console.error('Erro ao salvar capa', error);
+      App.showToast('Não foi possível salvar a capa. Tente novamente.');
+      return;
+    }
+
+    const nextCover = {
+      cover_url: data?.cover_url || uploadData.cover_url || null,
+      cover_path: data?.cover_path || uploadData.cover_path || null
+    };
+
+    if (entityKey === 'areas') {
+      this.state.areas = this.state.areas.map((area) =>
+        String(area.id) === String(entityId) ? { ...area, ...data, ...nextCover } : area
+      );
+      ProjectUI.renderAreas(this.state.areas);
+      this.state.areas.forEach((area) => ProjectUI.renderSubAreas(area.id, this.state.subAreas, this.state.corners));
+    }
+
+    if (entityKey === 'subareas') {
+      const parentAreaId = this.findAreaIdBySubArea(entityId);
+      this.state.subAreas = this.state.subAreas.map((sa) =>
+        String(sa.id) === String(entityId) ? { ...sa, ...data, ...nextCover } : sa
+      );
+      if (parentAreaId) {
+        ProjectUI.renderSubAreas(parentAreaId, this.state.subAreas, this.state.corners);
+      }
+    }
+
+    if (entityKey === 'corners') {
+      const targetCorner = this.state.corners.find((c) => String(c.id) === String(entityId));
+      const parentSubAreaId = targetCorner?.sub_area_id || data?.sub_area_id || null;
+      this.state.corners = this.state.corners.map((c) =>
+        String(c.id) === String(entityId) ? { ...c, ...data, ...nextCover } : c
+      );
+      if (parentSubAreaId) {
+        const parentAreaId = this.findAreaIdBySubArea(parentSubAreaId);
+        if (parentAreaId) {
+          ProjectUI.renderSubAreas(parentAreaId, this.state.subAreas, this.state.corners);
+        }
+      }
+    }
+
+    App.showToast('Capa atualizada.');
   },
 
   currentScopeFilter() {
@@ -1388,6 +1532,15 @@ const ProjectPage = {
 
 // Delegação específica da página de projeto (áreas, subáreas, cantos e tarefas)
 document.addEventListener('click', async (event) => {
+  const coverTrigger = event.target.closest('[data-entity-cover]');
+  if (coverTrigger) {
+    event.preventDefault();
+    const type = coverTrigger.dataset.entityCover;
+    const id = coverTrigger.dataset.entityId;
+    ProjectPage.openCoverFileSelector(type, id);
+    return;
+  }
+
   const delAreaBtn = event.target.closest('[data-action="delete-area"]');
   if (delAreaBtn) {
     event.preventDefault();
