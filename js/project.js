@@ -6,12 +6,18 @@ const ProjectDomain = {
   placeholderProgress() {
     return 72;
   },
+  formatDateBR(raw) {
+    if (!raw) return null;
+    const date = raw instanceof Date ? raw : new Date(raw);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+  },
   // Formata período amigável.
   formatPeriod(start, end) {
-    if (!start && !end) return 'Sem datas';
-    const s = start || '—';
-    const e = end || '—';
-    return `${s} · ${e}`;
+    const startFormatted = ProjectDomain.formatDateBR(start);
+    const endFormatted = ProjectDomain.formatDateBR(end);
+    if (!startFormatted || !endFormatted) return 'Período · —';
+    return `Período · ${startFormatted} — ${endFormatted}`;
   },
   findAreaName(areas, id) {
     return areas.find((a) => String(a.id) === String(id))?.name || 'Área';
@@ -136,6 +142,15 @@ function computeBudgetIndicators(tasks) {
   return { sumExpected, sumReal, isOverBudget: sumReal > sumExpected };
 }
 
+const BRL_FORMATTER = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+function formatCurrencyBRL(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) return null;
+  return BRL_FORMATTER.format(parsed);
+}
+
 function loadPointsLedger(userId, projectId) {
   const key = `msh_points_${userId}_${projectId}`;
   try {
@@ -210,22 +225,21 @@ const ProjectUI = {
     const typeEl = document.getElementById('project-type');
     const periodEl = document.getElementById('project-period');
     const budgetEl = document.getElementById('project-budget');
-    const metaEl = document.getElementById('project-meta');
     const coverImg = document.getElementById('project-cover-img');
     const coverShell = document.getElementById('project-cover-shell');
     const coverOverlayText = document.getElementById('project-cover-placeholder-text');
-    if (!project || !nameEl || !typeEl || !periodEl || !budgetEl || !metaEl) return;
+    if (!project || !nameEl || !typeEl || !periodEl || !budgetEl) return;
 
     nameEl.textContent = project.name;
     typeEl.textContent = `${project.home_type || 'Tipo'} · ${project.mode || 'macro'}`;
     periodEl.textContent = ProjectDomain.formatPeriod(project.start_date, project.end_date);
-    budgetEl.textContent = project.budget_expected
-      ? `Budget planejado R$ ${project.budget_expected}`
-      : 'Budget não definido';
-    metaEl.innerHTML = `
-      <span class="pill">Progresso ${ProjectDomain.placeholderProgress()}%</span>
-      <span class="pill outline">Budget real ${project.budget_real || 0}</span>
-    `;
+    const formattedBudget = formatCurrencyBRL(project.budget_expected);
+    budgetEl.textContent = formattedBudget ? `Budget planejado ${formattedBudget}` : 'Budget não definido';
+    ProjectUI.renderHeroIndicators({
+      progressPercent: null,
+      budgetExpected: project.budget_expected,
+      budgetReal: project.budget_real
+    });
 
     if (coverImg) {
       coverImg.alt = `Capa do projeto ${project.name || ''}`.trim();
@@ -246,6 +260,35 @@ const ProjectUI = {
     if (coverOverlayText) {
       coverOverlayText.textContent = isPlaceholder ? 'Imagem placeholder' : 'Clique para trocar a capa';
     }
+  },
+
+  renderHeroIndicators({ progressPercent, budgetExpected, budgetReal } = {}) {
+    const meta = document.getElementById('project-meta');
+    if (!meta) return;
+    const hasProgress = typeof progressPercent === 'number' && !Number.isNaN(progressPercent);
+    const cappedProgress = hasProgress ? Math.min(Math.max(progressPercent, 0), 100) : 0;
+    const progressLabel = hasProgress ? `${progressPercent}%` : '—%';
+    const formattedExpected = formatCurrencyBRL(budgetExpected);
+    const formattedReal = formatCurrencyBRL(budgetReal);
+    const plannedLabel = formattedExpected ? `Orçado: ${formattedExpected}` : 'Orçado: —';
+    const spentNumber = Number(budgetReal);
+    const expectedNumber = Number(budgetExpected);
+    const isOverBudget =
+      !Number.isNaN(spentNumber) && !Number.isNaN(expectedNumber) && expectedNumber !== 0 && spentNumber > expectedNumber;
+    const spentLabel = formattedReal ? `Gasto: ${formattedReal}` : 'Gasto: —';
+
+    meta.innerHTML = `
+      <div class="meta-progress">
+        <p class="eyebrow subtle-text">Progresso · <span class="meta-progress__value">${progressLabel}</span></p>
+        <div class="meta-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${cappedProgress}">
+          <span style="width: ${cappedProgress}%"></span>
+        </div>
+      </div>
+      <div class="meta-budget">
+        <p class="muted small budget-line">${plannedLabel}</p>
+        <p class="muted small budget-line ${isOverBudget ? 'budget-over' : ''}">${spentLabel}</p>
+      </div>
+    `;
   },
 
   renderAreas(areas) {
@@ -564,6 +607,7 @@ const ProjectPage = {
     await this.loadTasks(projectId);
     this.bindAreaForm(projectId);
     this.bindTaskForm(projectId);
+    this.bindAddRoomCard();
     this.bindScopeSelectors();
 
     const coverShell = document.getElementById('project-cover-shell');
@@ -726,6 +770,11 @@ const ProjectPage = {
     const points = computeProjectPoints(tasks);
     const deadlines = computeDeadlineIndicators(this.state.project, tasks);
     const budget = computeBudgetIndicators(tasks);
+    ProjectUI.renderHeroIndicators({
+      progressPercent: progress.progressPercent,
+      budgetExpected: this.state.project?.budget_expected,
+      budgetReal: this.state.project?.budget_real
+    });
 
     const cards = [
       { label: 'Progresso do projeto', value: `${progress.progressPercent}%`, caption: `Peso total ${progress.W}` },
@@ -779,6 +828,8 @@ const ProjectPage = {
 
   bindAreaForm(projectId) {
     const form = document.getElementById('areaForm');
+    const formCard = document.getElementById('area-form-card');
+    const cancelBtn = form?.querySelector('[data-action="cancel-area-form"]');
     if (!form) return;
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -813,7 +864,19 @@ const ProjectPage = {
         this.state.scopeSelection.areaId = data.id;
         this.syncScopeUI();
       }
+      this.hideAreaForm();
     });
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => this.hideAreaForm());
+    }
+    if (formCard) {
+      formCard.addEventListener('transitionend', () => {
+        if (formCard.classList.contains('hidden')) {
+          formCard.setAttribute('aria-hidden', 'true');
+        }
+      });
+    }
   },
 
   async handleDeleteArea(id, trigger) {
@@ -1149,6 +1212,44 @@ const ProjectPage = {
     areaSel.addEventListener('change', syncAndLoad);
     subAreaSel.addEventListener('change', syncAndLoad);
     cornerSel.addEventListener('change', syncAndLoad);
+  },
+
+  bindAddRoomCard() {
+    const trigger = document.getElementById('add-room-card');
+    const formCard = document.getElementById('area-form-card');
+    if (!trigger || !formCard) return;
+    const openForm = () => {
+      trigger.setAttribute('aria-expanded', 'true');
+      formCard.classList.remove('hidden');
+      formCard.classList.add('is-revealed');
+      formCard.setAttribute('aria-hidden', 'false');
+      const input = formCard.querySelector('#areaName');
+      if (input) input.focus();
+    };
+    trigger.addEventListener('click', openForm);
+    trigger.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        openForm();
+      }
+    });
+  },
+
+  hideAreaForm() {
+    const trigger = document.getElementById('add-room-card');
+    const formCard = document.getElementById('area-form-card');
+    const form = document.getElementById('areaForm');
+    if (formCard) {
+      formCard.classList.add('hidden');
+      formCard.classList.remove('is-revealed');
+      formCard.setAttribute('aria-hidden', 'true');
+    }
+    if (trigger) {
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+    if (form) {
+      form.reset();
+    }
   },
 
   syncScopeFromUI() {
