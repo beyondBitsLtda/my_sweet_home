@@ -88,6 +88,37 @@ function normalizeWeight(raw) {
   return WEIGHT.hasOwnProperty(key) ? WEIGHT[key] : null;
 }
 
+const ENTITY_COVER_PLACEHOLDER = 'assets/img/add_room.jpg';
+
+function resolveEntityCover(entity) {
+  const supabase = DB.initSupabase();
+  if (entity?.cover_url) return { src: entity.cover_url, isPlaceholder: false };
+  if (entity?.cover_path) {
+    const { data } = supabase.storage.from('home-covers').getPublicUrl(entity.cover_path);
+    if (data?.publicUrl) return { src: data.publicUrl, isPlaceholder: false };
+  }
+  return { src: ENTITY_COVER_PLACEHOLDER, isPlaceholder: true };
+}
+
+function buildEntityCoverHTML({ src, isPlaceholder, entityType, entityId, alt, size = 'default' }) {
+  const sizeClass = size === 'compact' ? 'is-compact' : size === 'tight' ? 'is-tight' : '';
+  const overlayText = isPlaceholder
+    ? `
+      <span class="entity-cover-overlay__text">Imagem placeholder</span>
+      <span class="entity-cover-overlay__text subtle">Clique para escolher uma capa</span>
+    `
+    : `<span class="entity-cover-overlay__text">Trocar capa</span>`;
+
+  return `
+    <figure class="entity-cover-frame ${sizeClass} ${isPlaceholder ? 'is-placeholder' : ''}" data-action="pick-entity-cover" data-entity-type="${entityType}" data-entity-id="${entityId}">
+      <img class="entity-cover-img" src="${src}" alt="${alt}" loading="lazy" />
+      <div class="entity-cover-overlay">
+        ${overlayText}
+      </div>
+    </figure>
+  `;
+}
+
 function getWeightValue(raw) {
   const normalized = normalizeWeight(raw) || 'medium';
   if (normalized === 'light') return 1;
@@ -300,18 +331,18 @@ const ProjectUI = {
     }
     grid.innerHTML = areas
       .map((area) => {
-        const coverSrc = area.cover_url || 'assets/img/project_placeholder.webp';
-        const isPlaceholder = !area.cover_url;
+        const cover = resolveEntityCover(area);
+        const coverHTML = buildEntityCoverHTML({
+          src: cover.src,
+          isPlaceholder: cover.isPlaceholder,
+          entityType: 'areas',
+          entityId: area.id,
+          alt: `Capa do cômodo ${area.name}`
+        });
         return `
       <article class="card area-card" data-area-id="${area.id}">
-        <div class="area-cover-shell ${isPlaceholder ? 'is-placeholder' : ''}">
-          <img
-            src="${coverSrc}"
-            alt="Capa do cômodo ${area.name}"
-            loading="lazy"
-            data-entity-cover="areas"
-            data-entity-id="${area.id}"
-          />
+        <div class="area-cover-shell">
+          ${coverHTML}
         </div>
         <div class="card-top">
           <div>
@@ -370,19 +401,23 @@ const ProjectUI = {
 
     list.innerHTML = scoped
       .map((sa) => {
+        const subAreaCover = resolveEntityCover(sa);
         const cornersForSub = corners.filter((c) => String(c.sub_area_id) === String(sa.id));
         const cornersList = cornersForSub
           .map(
-            (c) => `
+            (c) => {
+              const cornerCover = resolveEntityCover(c);
+              return `
               <div class="nested-row">
-                <div class="corner-cover ${c.cover_url ? '' : 'is-placeholder'}">
-                  <img
-                    src="${c.cover_url || 'assets/img/project_placeholder.webp'}"
-                    alt="Capa do canto ${c.name}"
-                    loading="lazy"
-                    data-entity-cover="corners"
-                    data-entity-id="${c.id}"
-                  />
+                <div class="corner-cover">
+                  ${buildEntityCoverHTML({
+                    src: cornerCover.src,
+                    isPlaceholder: cornerCover.isPlaceholder,
+                    entityType: 'corners',
+                    entityId: c.id,
+                    alt: \`Capa do canto ${c.name}\`,
+                    size: 'tight'
+                  })}
                 </div>
                 <div>
                   <p class="label">${c.name}</p>
@@ -394,20 +429,22 @@ const ProjectUI = {
                   <button class="btn ghost danger tiny" data-action="delete-corner" data-corner-id="${c.id}">Remover</button>
                 </div>
               </div>
-            `
+            `;
+            }
           )
           .join('');
 
         return `
           <article class="nested-card" data-sub-area-id="${sa.id}">
-            <div class="nested-cover ${sa.cover_url ? '' : 'is-placeholder'}">
-              <img
-                src="${sa.cover_url || 'assets/img/project_placeholder.webp'}"
-                alt="Capa da subárea ${sa.name}"
-                loading="lazy"
-                data-entity-cover="subareas"
-                data-entity-id="${sa.id}"
-              />
+            <div class="nested-cover">
+              ${buildEntityCoverHTML({
+                src: subAreaCover.src,
+                isPlaceholder: subAreaCover.isPlaceholder,
+                entityType: 'subareas',
+                entityId: sa.id,
+                alt: \`Capa da subárea ${sa.name}\`,
+                size: 'compact'
+              })}
             </div>
             <div class="nested-row">
               <div>
@@ -586,6 +623,7 @@ const ProjectPage = {
       subAreaId: null,
       cornerId: null
     },
+    coverUploadContext: null,
     entityCoverInput: null,
     photoModal: {
       taskId: null,
@@ -768,17 +806,16 @@ const ProjectPage = {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    input.id = 'entity-cover-upload';
     input.hidden = true;
     input.addEventListener('change', async (event) => {
       const file = event.target.files?.[0];
-      const type = input.dataset.entityType;
-      const id = input.dataset.entityId;
-      if (!file || !type || !id) {
-        input.value = '';
-        return;
+      const ctx = this.state.coverUploadContext;
+      if (file && ctx?.entityType && ctx?.entityId) {
+        await this.handleEntityCoverUpload(ctx.entityType, ctx.entityId, file);
       }
-      await this.handleEntityCoverUpload(type, id, file);
       input.value = '';
+      this.state.coverUploadContext = null;
     });
     document.body.appendChild(input);
     this.state.entityCoverInput = input;
@@ -786,10 +823,10 @@ const ProjectPage = {
   },
 
   openCoverFileSelector(entityType, entityId) {
+    if (!entityType || !entityId) return;
+    this.state.coverUploadContext = { entityType, entityId };
     const input = this.ensureEntityCoverInput();
     if (!input) return;
-    input.dataset.entityType = entityType;
-    input.dataset.entityId = entityId;
     input.value = '';
     input.click();
   },
@@ -812,7 +849,7 @@ const ProjectPage = {
     });
     if (uploadError || !uploadData) {
       console.error('Erro ao enviar capa', uploadError);
-      App.showToast('Não foi possível enviar a capa. Tente novamente.');
+      App.showToast('Erro ao enviar capa');
       return;
     }
 
@@ -833,7 +870,7 @@ const ProjectPage = {
     const { data, error } = updateResult;
     if (error) {
       console.error('Erro ao salvar capa', error);
-      App.showToast('Não foi possível salvar a capa. Tente novamente.');
+      App.showToast('Imagem enviada, mas não vinculada (verifique colunas cover_path/cover_url e RLS)');
       return;
     }
 
@@ -1532,10 +1569,10 @@ const ProjectPage = {
 
 // Delegação específica da página de projeto (áreas, subáreas, cantos e tarefas)
 document.addEventListener('click', async (event) => {
-  const coverTrigger = event.target.closest('[data-entity-cover]');
+  const coverTrigger = event.target.closest('[data-action="pick-entity-cover"]');
   if (coverTrigger) {
     event.preventDefault();
-    const type = coverTrigger.dataset.entityCover;
+    const type = coverTrigger.dataset.entityType;
     const id = coverTrigger.dataset.entityId;
     ProjectPage.openCoverFileSelector(type, id);
     return;
