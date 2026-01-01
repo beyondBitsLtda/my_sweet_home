@@ -1684,4 +1684,5 @@ document.addEventListener('submit', async (event) => {
   if (!window.initProjectPage) {
     window.initProjectPage = initProjectPage;
   }
+  window.dispatchEvent(new Event('ProjectPageReady'));
 })();
