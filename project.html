@@ -35,10 +35,17 @@
           <p class="eyebrow" id="project-type">Projeto</p>
           <h1 id="project-name">Carregando projeto...</h1>
           <p class="muted" id="project-period">—</p>
-          <p class="muted" id="project-budget">—</p>
-          <div class="pill-row" id="project-meta">
-            <span class="pill">Progresso 72%</span>
-            <span class="pill outline">Budget</span>
+          <div class="hero-meta" id="project-meta">
+            <div class="meta-progress">
+              <p class="eyebrow subtle-text">Progresso · <span class="meta-progress__value">—%</span></p>
+              <div class="meta-progress__bar" aria-hidden="true">
+                <span style="width: 0%"></span>
+              </div>
+            </div>
+            <div class="meta-budget">
+              <p class="muted small budget-line">Orçado: —</p>
+              <p class="muted small budget-line">Gasto: —</p>
+            </div>
           </div>
         </div>
         <div class="project-hero-cover cover-frame is-hero is-clickable" id="project-cover-shell">
@@ -77,7 +84,6 @@
         <div class="area-grid" id="areas-grid">
           <!-- cards de áreas via JS -->
         </div>
-        <input type="file" accept="image/*" id="entity-cover-upload" hidden />
 
         <article class="card add-room-card" id="add-room-card" role="button" tabindex="0" aria-expanded="false">
           <div class="add-room-media">
@@ -243,10 +249,8 @@
   <script src="js/db.js"></script>
   <script src="js/project.js"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      if (window.ProjectPage?.init) {
-        window.ProjectPage.init();
-      }
+    document.addEventListener('DOMContentLoaded', async () => {
+      await ProjectPage.init();
     });
   </script>
 </body>
