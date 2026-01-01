@@ -35,17 +35,10 @@
           <p class="eyebrow" id="project-type">Projeto</p>
           <h1 id="project-name">Carregando projeto...</h1>
           <p class="muted" id="project-period">—</p>
-          <div class="hero-meta" id="project-meta">
-            <div class="meta-progress">
-              <p class="eyebrow subtle-text">Progresso · <span class="meta-progress__value">—%</span></p>
-              <div class="meta-progress__bar" aria-hidden="true">
-                <span style="width: 0%"></span>
-              </div>
-            </div>
-            <div class="meta-budget">
-              <p class="muted small budget-line">Orçado: —</p>
-              <p class="muted small budget-line">Gasto: —</p>
-            </div>
+          <p class="muted" id="project-budget">—</p>
+          <div class="pill-row" id="project-meta">
+            <span class="pill">Progresso 72%</span>
+            <span class="pill outline">Budget</span>
           </div>
         </div>
         <div class="project-hero-cover cover-frame is-hero is-clickable" id="project-cover-shell">
@@ -250,8 +243,10 @@
   <script src="js/db.js"></script>
   <script src="js/project.js"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-      await ProjectPage.init();
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.ProjectPage?.init) {
+        window.ProjectPage.init();
+      }
     });
   </script>
 </body>

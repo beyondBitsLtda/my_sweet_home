@@ -349,6 +349,40 @@ const DB = (() => {
     return supabase.from('projects').select('*').eq('id', id).single();
   }
 
+  async function requireAuthOrRedirect() {
+    const supabase = initSupabase();
+    let session = null;
+    let sessionError = null;
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      sessionError = error || null;
+      session = data?.session || null;
+      if (sessionError) {
+        console.warn('[auth] getSession error', sessionError);
+      }
+    } catch (err) {
+      sessionError = err;
+      console.warn('[auth] getSession exception', err);
+    }
+
+    const shouldInvalidate =
+      sessionError?.status === 400 ||
+      sessionError?.message?.toLowerCase?.().includes('refresh_token') ||
+      !session;
+
+    if (shouldInvalidate) {
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutErr) {
+        console.warn('[auth] signOut after invalid session failed', signOutErr);
+      }
+      window.location.href = 'index.html';
+      return { session: null, error: sessionError, expired: true };
+    }
+
+    return { session, error: sessionError, expired: false };
+  }
+
   // ---------------------------
   // CRUD de áreas (cômodos) — V1
   // ---------------------------
@@ -625,6 +659,7 @@ const DB = (() => {
     updateProjectCover,
     getSignedProjectCoverUrl,
     getProjectCoverUrl,
+    requireAuthOrRedirect,
     onAuthStateChange,
     upsertProfile,
     createProject,
