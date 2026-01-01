@@ -41,12 +41,14 @@
             <span class="pill outline">Budget</span>
           </div>
         </div>
-        <div class="project-hero-cover" id="project-cover-shell">
-          <img class="hero-cover hidden" id="project-cover-img" loading="lazy" alt="Capa do projeto" />
-          <div class="project-hero-placeholder" id="project-cover-placeholder">
-            <span class="muted">Sem capa</span>
+        <div class="project-hero-cover cover-frame is-hero is-clickable" id="project-cover-shell">
+          <img class="hero-cover cover-img hidden" id="project-cover-img" loading="lazy" alt="Capa do projeto" />
+          <div class="cover-overlay" id="project-cover-overlay">
+            <span class="cover-overlay__text" id="project-cover-placeholder-text">Imagem placeholder</span>
+            <span class="cover-overlay__text subtle">Clique para trocar a capa</span>
           </div>
         </div>
+        <input type="file" class="hidden" id="project-cover-upload" accept="image/*" />
       </div>
 
       <div class="tabs" role="tablist">

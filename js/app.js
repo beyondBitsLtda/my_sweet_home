@@ -539,13 +539,15 @@ const App = {
         const progress = 72;
         const period = proj.start_date && proj.end_date ? `${proj.start_date} · ${proj.end_date}` : 'Sem datas';
         const budget = proj.budget_expected ? `Budget R$ ${proj.budget_expected}` : 'Budget não definido';
-        const coverSrc = proj.cover_url || proj.resolved_cover_url || null;
-        const cover = coverSrc
-          ? `<div class="project-cover-shell">
-              <img class="project-cover" src="${coverSrc}" alt="Capa do projeto ${proj.name}" data-cover-path="${proj.cover_path || ''}" onerror="App.handleCoverError(event)" />
-              <div class="project-cover placeholder hidden"><span class="muted">Sem foto</span></div>
-            </div>`
-          : `<div class="project-cover placeholder"><span class="muted">Sem foto</span></div>`;
+        const coverSrc = proj.cover_url || proj.resolved_cover_url || 'assets/img/project_placeholder.webp';
+        const isPlaceholder = !proj.cover_url && !proj.resolved_cover_url;
+        const cover = `
+          <div class="cover-frame is-card ${isPlaceholder ? 'is-placeholder' : ''}">
+            <img class="cover-img" src="${coverSrc}" alt="Capa do projeto ${proj.name}" data-cover-path="${proj.cover_path || ''}" onerror="App.handleCoverError(event)" />
+            <div class="cover-overlay">
+              <span class="cover-overlay__text">Imagem placeholder</span>
+            </div>
+          </div>`;
         return `
         <article class="card project-card">
           ${cover}
@@ -572,16 +574,15 @@ const App = {
   handleCoverError(event) {
     const img = event?.target;
     if (!img) return;
-    const shell = img.closest('.project-cover-shell');
-    const placeholder = shell?.querySelector('.project-cover.placeholder');
+    const shell = img.closest('.cover-frame');
     const coverPath = img.dataset.coverPath;
 
     // Se já tentamos fallback, mostra placeholder.
     if (img.dataset.signedTried === 'true' || !coverPath) {
       console.warn('Capa do projeto não carregou', img.src);
       img.onerror = null;
-      img.classList.add('hidden');
-      if (placeholder) placeholder.classList.remove('hidden');
+      img.src = 'assets/img/project_placeholder.webp';
+      if (shell) shell.classList.add('is-placeholder');
       return;
     }
 

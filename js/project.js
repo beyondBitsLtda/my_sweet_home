@@ -212,7 +212,8 @@ const ProjectUI = {
     const budgetEl = document.getElementById('project-budget');
     const metaEl = document.getElementById('project-meta');
     const coverImg = document.getElementById('project-cover-img');
-    const coverPlaceholder = document.getElementById('project-cover-placeholder');
+    const coverShell = document.getElementById('project-cover-shell');
+    const coverOverlayText = document.getElementById('project-cover-placeholder-text');
     if (!project || !nameEl || !typeEl || !periodEl || !budgetEl || !metaEl) return;
 
     nameEl.textContent = project.name;
@@ -238,9 +239,12 @@ const ProjectUI = {
       coverImg.src = coverSrc;
       coverImg.classList.remove('hidden');
     }
-    if (coverPlaceholder) {
-      const hasImage = Boolean(coverImg && !coverImg.classList.contains('hidden'));
-      coverPlaceholder.classList.toggle('hidden', hasImage);
+    const isPlaceholder = !project.cover_url && !project.cover_path;
+    if (coverShell) {
+      coverShell.classList.toggle('is-placeholder', isPlaceholder);
+    }
+    if (coverOverlayText) {
+      coverOverlayText.textContent = isPlaceholder ? 'Imagem placeholder' : 'Clique para trocar a capa';
     }
   },
 
@@ -561,6 +565,19 @@ const ProjectPage = {
     this.bindAreaForm(projectId);
     this.bindTaskForm(projectId);
     this.bindScopeSelectors();
+
+    const coverShell = document.getElementById('project-cover-shell');
+    const coverUpload = document.getElementById('project-cover-upload');
+    if (coverShell && coverUpload) {
+      coverShell.addEventListener('click', () => coverUpload.click());
+      coverUpload.addEventListener('change', async (event) => {
+        const file = event.target.files?.[0];
+        if (file) {
+          await this.handleCoverChange(file);
+          coverUpload.value = '';
+        }
+      });
+    }
   },
 
   async loadProject(projectId) {
@@ -572,6 +589,46 @@ const ProjectPage = {
     }
     this.state.project = data;
     await ProjectUI.renderProjectDetail(data);
+  },
+
+  async handleCoverChange(file) {
+    if (!file) return;
+    const userId = App.state.user?.id;
+    const projectId = this.state.project?.id || this.state.projectId;
+    if (!userId || !projectId) {
+      App.showToast('Não foi possível identificar o projeto.');
+      return;
+    }
+    const prev = { ...this.state.project };
+    const { data: uploadData, error: uploadError } = await DB.uploadProjectCover(userId, projectId, file);
+    if (uploadError || !uploadData) {
+      console.error('Erro ao enviar capa', uploadError);
+      App.showToast('Não foi possível enviar a capa. Tente novamente.');
+      return;
+    }
+
+    const { data: updated, error: updateError } = await DB.updateProjectCover(
+      projectId,
+      userId,
+      uploadData.cover_url,
+      uploadData.cover_path
+    );
+    if (updateError) {
+      console.error('Erro ao salvar capa', updateError);
+      App.showToast('Não foi possível salvar a capa. Tente novamente.');
+      return;
+    }
+
+    const newCoverUrl = updated?.cover_url || uploadData.cover_url || null;
+    const newCoverPath = updated?.cover_path || uploadData.cover_path || null;
+    this.state.project = {
+      ...prev,
+      ...updated,
+      cover_url: newCoverUrl,
+      cover_path: newCoverPath
+    };
+    await ProjectUI.renderProjectDetail(this.state.project);
+    App.showToast('Capa atualizada.');
   },
 
   async loadAreas(projectId) {
