@@ -619,6 +619,15 @@ a {
   box-shadow: var(--shadow-soft);
 }
 
+@media (max-width: 768px) {
+  .add-room-card {
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+  }
+}
+
 .area-form-card {
   opacity: 0;
   transform: translateY(6px);
