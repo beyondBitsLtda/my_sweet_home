@@ -136,6 +136,43 @@ a {
   margin-top: var(--space-6);
 }
 
+.project-hero {
+  align-items: center;
+}
+
+.project-hero-content {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.project-hero-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: linear-gradient(145deg, #f8f3ec 0%, #ffffff 100%);
+  box-shadow: var(--shadow-card);
+}
+
+.project-hero-cover .hero-cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.project-hero-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #f8f3ec 0%, #ffffff 100%);
+}
+
 .hero-text h1 {
   font-family: var(--font-heading);
   font-size: clamp(1.8rem, 3vw, 2.4rem);

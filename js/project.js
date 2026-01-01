@@ -205,12 +205,14 @@ const ProjectUI = {
     container.innerHTML = cards + locked;
   },
 
-  renderProjectDetail(project) {
+  async renderProjectDetail(project) {
     const nameEl = document.getElementById('project-name');
     const typeEl = document.getElementById('project-type');
     const periodEl = document.getElementById('project-period');
     const budgetEl = document.getElementById('project-budget');
     const metaEl = document.getElementById('project-meta');
+    const coverImg = document.getElementById('project-cover-img');
+    const coverPlaceholder = document.getElementById('project-cover-placeholder');
     if (!project || !nameEl || !typeEl || !periodEl || !budgetEl || !metaEl) return;
 
     nameEl.textContent = project.name;
@@ -223,6 +225,23 @@ const ProjectUI = {
       <span class="pill">Progresso ${ProjectDomain.placeholderProgress()}%</span>
       <span class="pill outline">Budget real ${project.budget_real || 0}</span>
     `;
+
+    if (coverImg) {
+      coverImg.alt = `Capa do projeto ${project.name || ''}`.trim();
+      let coverSrc = project.cover_url || null;
+      if (!coverSrc && project.cover_path) {
+        coverSrc = await DB.getProjectCoverUrl(project);
+      }
+      if (!coverSrc) {
+        coverSrc = 'assets/img/project_placeholder.webp';
+      }
+      coverImg.src = coverSrc;
+      coverImg.classList.remove('hidden');
+    }
+    if (coverPlaceholder) {
+      const hasImage = Boolean(coverImg && !coverImg.classList.contains('hidden'));
+      coverPlaceholder.classList.toggle('hidden', hasImage);
+    }
   },
 
   renderAreas(areas) {
@@ -533,7 +552,7 @@ const ProjectPage = {
     }
 
     this.state.project = project;
-    ProjectUI.renderProjectDetail(project);
+    await ProjectUI.renderProjectDetail(project);
 
     await this.loadAreas(projectId);
     await this.hydrateSubAreasAndCorners();
@@ -552,7 +571,7 @@ const ProjectPage = {
       return;
     }
     this.state.project = data;
-    ProjectUI.renderProjectDetail(data);
+    await ProjectUI.renderProjectDetail(data);
   },
 
   async loadAreas(projectId) {
