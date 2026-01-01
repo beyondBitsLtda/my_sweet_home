@@ -36,24 +36,17 @@
           <h1 id="project-name">Carregando projeto...</h1>
           <p class="muted" id="project-period">—</p>
           <p class="muted" id="project-budget">—</p>
-          <div class="hero-indicators" id="project-meta">
-            <article class="indicator-card">
-              <div class="indicator-header">
-                <p class="eyebrow">Progresso</p>
-                <span class="indicator-value muted">—</span>
-              </div>
-              <div class="indicator-bar" aria-hidden="true">
+          <div class="hero-meta" id="project-meta">
+            <div class="meta-progress">
+              <p class="eyebrow subtle-text">Progresso · <span class="meta-progress__value">—%</span></p>
+              <div class="meta-progress__bar" aria-hidden="true">
                 <span style="width: 0%"></span>
               </div>
-              <p class="muted small">Aguardando tarefas</p>
-            </article>
-            <article class="indicator-card">
-              <div class="indicator-header">
-                <p class="eyebrow">Budget</p>
-                <span class="indicator-value muted">—</span>
-              </div>
-              <p class="muted small">Sem valores cadastrados</p>
-            </article>
+            </div>
+            <div class="meta-budget">
+              <p class="muted small budget-line">Orçado: —</p>
+              <p class="muted small budget-line">Gasto: —</p>
+            </div>
           </div>
         </div>
         <div class="project-hero-cover cover-frame is-hero is-clickable" id="project-cover-shell">

@@ -261,34 +261,27 @@ const ProjectUI = {
     if (!meta) return;
     const hasProgress = typeof progressPercent === 'number' && !Number.isNaN(progressPercent);
     const cappedProgress = hasProgress ? Math.min(Math.max(progressPercent, 0), 100) : 0;
-    const progressLabel = hasProgress ? `${progressPercent}%` : '—';
+    const progressLabel = hasProgress ? `${progressPercent}%` : '—%';
     const formattedExpected = formatCurrencyBRL(budgetExpected);
     const formattedReal = formatCurrencyBRL(budgetReal);
-    const plannedLabel = formattedExpected || '—';
+    const plannedLabel = formattedExpected ? `Orçado: ${formattedExpected}` : 'Orçado: —';
+    const spentNumber = Number(budgetReal);
+    const expectedNumber = Number(budgetExpected);
+    const isOverBudget =
+      !Number.isNaN(spentNumber) && !Number.isNaN(expectedNumber) && expectedNumber !== 0 && spentNumber > expectedNumber;
+    const spentLabel = formattedReal ? `Gasto: ${formattedReal}` : 'Gasto: —';
 
     meta.innerHTML = `
-      <article class="indicator-card">
-        <div class="indicator-header">
-          <p class="eyebrow">Progresso</p>
+      <div class="meta-progress">
+        <p class="eyebrow subtle-text">Progresso · <span class="meta-progress__value">${progressLabel}</span></p>
+        <div class="meta-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${cappedProgress}">
+          <span style="width: ${cappedProgress}%"></span>
         </div>
-        <div class="indicator-track">
-          <div class="indicator-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${cappedProgress}">
-            <span style="width: ${cappedProgress}%"></span>
-          </div>
-          <span class="indicator-chip">${progressLabel}</span>
-        </div>
-        <p class="muted small">Avanço das tarefas concluídas</p>
-      </article>
-      <article class="indicator-card">
-        <div class="indicator-header">
-          <p class="eyebrow">Budget</p>
-          <span class="indicator-value">${plannedLabel}</span>
-        </div>
-        <div class="indicator-meta muted small">
-          <span>Planejado ${formattedExpected ? formattedExpected : '—'}</span>
-          ${formattedReal ? `<span>Real ${formattedReal}</span>` : ''}
-        </div>
-      </article>
+      </div>
+      <div class="meta-budget">
+        <p class="muted small budget-line">${plannedLabel}</p>
+        <p class="muted small budget-line ${isOverBudget ? 'budget-over' : ''}">${spentLabel}</p>
+      </div>
     `;
   },
 
