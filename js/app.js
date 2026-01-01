@@ -11,7 +11,8 @@ const App = {
     projects: [],
     signupEmailTimer: null,
     signupEmailExists: false,
-    signupEmailCheckToken: null
+    signupEmailCheckToken: null,
+    selectedHomeType: null
   },
 
   // Navegação básica entre páginas HTML estáticas.
@@ -56,6 +57,36 @@ const App = {
     } else {
       loginCard.classList.remove('hidden');
       loggedCard.classList.add('hidden');
+    }
+  },
+
+  /**
+   * setHomeTypeSelection
+   * - Ajusta visualmente os cards de moradia e sincroniza o select do formulário.
+   */
+  setHomeTypeSelection(homeType) {
+    App.state.selectedHomeType = homeType;
+    const homeTypeSelect = document.getElementById('homeType');
+    const createCard = document.getElementById('createProjectCard');
+    const cards = document.querySelectorAll('.home-card');
+
+    cards.forEach((card) => {
+      const isSelected = card.dataset.homeType === homeType;
+      card.classList.toggle('selected', isSelected);
+      const label = card.querySelector('[data-selected-label]');
+      if (label) label.classList.toggle('hidden', !isSelected);
+      if (card.dataset.state === 'disabled' || card.classList.contains('is-disabled')) {
+        card.setAttribute('aria-pressed', 'false');
+      } else {
+        card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+      }
+    });
+
+    if (homeTypeSelect && homeType) {
+      homeTypeSelect.value = homeType;
+    }
+    if (createCard) {
+      createCard.classList.toggle('hidden', !homeType);
     }
   },
 
@@ -643,6 +674,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     await App.requireAuth();
     await App.loadProjects(App.state.user);
 
+    const homeTypeGrid = document.getElementById('homeTypeGrid');
+    const homeTypeSelect = document.getElementById('homeType');
+    const createCard = document.getElementById('createProjectCard');
+
+    if (createCard) createCard.classList.add('hidden');
+    App.setHomeTypeSelection(null);
+
+    if (homeTypeGrid) {
+      homeTypeGrid.addEventListener('click', (event) => {
+        const card = event.target.closest('.home-card');
+        if (!card) return;
+        const type = card.dataset.homeType;
+        const isDisabled = card.classList.contains('is-disabled') || card.dataset.state === 'disabled';
+        if (isDisabled) {
+          App.showToast('Disponível em breve');
+          return;
+        }
+        App.setHomeTypeSelection(type);
+      });
+    }
+
     const createForm = document.getElementById('createProjectForm');
     const coverInput = document.getElementById('projectCoverInput');
     const coverPreview = document.getElementById('projectCoverPreview');
@@ -689,7 +741,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           App.showToast('Faça login para criar projetos.');
           return;
         }
-        const homeType = createForm.home_type.value;
+        if (!App.state.selectedHomeType) {
+          App.showToast('Selecione o tipo de moradia para continuar.');
+          return;
+        }
+        const homeType = App.state.selectedHomeType;
+        if (homeTypeSelect) homeTypeSelect.value = homeType;
         if (homeType !== 'apartment') {
           App.showToast('Disponível em breve. Use Apartamento na V1.');
           return;
