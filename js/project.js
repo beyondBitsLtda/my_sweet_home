@@ -6,12 +6,18 @@ const ProjectDomain = {
   placeholderProgress() {
     return 72;
   },
+  formatDateBR(raw) {
+    if (!raw) return null;
+    const date = raw instanceof Date ? raw : new Date(raw);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+  },
   // Formata período amigável.
   formatPeriod(start, end) {
-    if (!start && !end) return 'Sem datas';
-    const s = start || '—';
-    const e = end || '—';
-    return `${s} · ${e}`;
+    const startFormatted = ProjectDomain.formatDateBR(start);
+    const endFormatted = ProjectDomain.formatDateBR(end);
+    if (!startFormatted || !endFormatted) return 'Período · —';
+    return `Período · ${startFormatted} — ${endFormatted}`;
   },
   findAreaName(areas, id) {
     return areas.find((a) => String(a.id) === String(id))?.name || 'Área';
