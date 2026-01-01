@@ -453,6 +453,16 @@ a {
   height: 180px;
 }
 
+.cover-frame.is-nested {
+  height: 160px;
+  border-radius: 10px;
+}
+
+.cover-frame.is-compact {
+  height: 120px;
+  border-radius: 10px;
+}
+
 .cover-frame.is-hero {
   aspect-ratio: 16 / 9;
   box-shadow: var(--shadow-card);
@@ -500,6 +510,14 @@ a {
 
 .cover-frame.is-clickable:hover .cover-overlay {
   opacity: 1;
+}
+
+.cover-frame.is-clickable:hover {
+  box-shadow: var(--shadow-card);
+}
+
+.cover-overlay.placeholder-flag {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(248, 245, 240, 0.82));
 }
 
 .muted-card {
