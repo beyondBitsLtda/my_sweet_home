@@ -36,9 +36,17 @@
           <h1 id="project-name">Carregando projeto...</h1>
           <p class="muted" id="project-period">—</p>
           <p class="muted" id="project-budget">—</p>
-          <div class="pill-row" id="project-meta">
-            <span class="pill">Progresso 72%</span>
-            <span class="pill outline">Budget</span>
+          <div class="hero-meta" id="project-meta">
+            <div class="meta-progress">
+              <p class="eyebrow subtle-text">Progresso · <span class="meta-progress__value">—%</span></p>
+              <div class="meta-progress__bar" aria-hidden="true">
+                <span style="width: 0%"></span>
+              </div>
+            </div>
+            <div class="meta-budget">
+              <p class="muted small budget-line">Orçado: —</p>
+              <p class="muted small budget-line">Gasto: —</p>
+            </div>
           </div>
         </div>
         <div class="project-hero-cover cover-frame is-hero is-clickable" id="project-cover-shell">
@@ -78,7 +86,18 @@
           <!-- cards de áreas via JS -->
         </div>
 
-        <div class="card" id="area-form-card">
+        <article class="card add-room-card" id="add-room-card" role="button" tabindex="0" aria-expanded="false">
+          <div class="add-room-media">
+            <!-- Substitua assets/img/add_room.jpg por uma imagem local quando disponível -->
+            <img src="assets/img/add_room.jpg" alt="Adicionar cômodo" loading="lazy" />
+          </div>
+          <div class="add-room-copy">
+            <p class="eyebrow">Adicionar cômodo</p>
+            <p class="muted">Clique para abrir o formulário e criar um novo espaço.</p>
+          </div>
+        </article>
+
+        <div class="card area-form-card hidden" id="area-form-card" aria-hidden="true">
           <p class="eyebrow">Criar cômodo</p>
           <h3>Novo cômodo</h3>
           <form class="auth-form" id="areaForm">
@@ -104,7 +123,10 @@
             <label class="muted" for="areaPhoto">Foto (opcional)</label>
             <input class="input" id="areaPhoto" name="photo_cover_url" placeholder="URL da foto (opcional)" />
 
-            <button class="btn primary" type="submit">Adicionar cômodo</button>
+            <div class="form-actions">
+              <button class="btn secondary" type="button" data-action="cancel-area-form">Cancelar</button>
+              <button class="btn primary" type="submit">Adicionar cômodo</button>
+            </div>
           </form>
         </div>
 
