@@ -6,12 +6,18 @@ const ProjectDomain = {
   placeholderProgress() {
     return 72;
   },
+  formatDateBR(raw) {
+    if (!raw) return null;
+    const date = raw instanceof Date ? raw : new Date(raw);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+  },
   // Formata período amigável.
   formatPeriod(start, end) {
-    if (!start && !end) return 'Sem datas';
-    const s = start || '—';
-    const e = end || '—';
-    return `${s} · ${e}`;
+    const startFormatted = ProjectDomain.formatDateBR(start);
+    const endFormatted = ProjectDomain.formatDateBR(end);
+    if (!startFormatted || !endFormatted) return 'Período · —';
+    return `Período · ${startFormatted} — ${endFormatted}`;
   },
   findAreaName(areas, id) {
     return areas.find((a) => String(a.id) === String(id))?.name || 'Área';
@@ -136,6 +142,51 @@ function computeBudgetIndicators(tasks) {
   return { sumExpected, sumReal, isOverBudget: sumReal > sumExpected };
 }
 
+const BRL_FORMATTER = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+function formatCurrencyBRL(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) return null;
+  return BRL_FORMATTER.format(parsed);
+}
+
+const HOME_COVER_PLACEHOLDER = 'assets/img/project_placeholder.webp';
+
+function resolveHomeCover(entity) {
+  const directUrl = entity?.cover_url || null;
+  if (directUrl) return { src: directUrl, isPlaceholder: false };
+
+  const coverPath = entity?.cover_path;
+  if (coverPath) {
+    try {
+      const supabase = DB.initSupabase();
+      const { data } = supabase.storage.from('home-covers').getPublicUrl(coverPath);
+      if (data?.publicUrl) return { src: data.publicUrl, isPlaceholder: false };
+    } catch (error) {
+      console.error('Falha ao gerar URL pública da capa', error);
+    }
+  }
+
+  return { src: HOME_COVER_PLACEHOLDER, isPlaceholder: true };
+}
+
+function buildCoverFrame({ src, alt, entityType, entityId, isPlaceholder, size = 'card' }) {
+  const sizeClass = size === 'nested' ? 'is-nested' : size === 'compact' ? 'is-compact' : 'is-card';
+  const placeholderText = isPlaceholder ? 'Imagem placeholder' : 'Trocar capa';
+  const placeholderClass = isPlaceholder ? 'is-placeholder' : '';
+  const overlayClass = isPlaceholder ? 'cover-overlay placeholder-flag' : 'cover-overlay';
+  return `
+    <figure class="cover-frame ${sizeClass} is-clickable ${placeholderClass}" data-action="change-cover" data-entity-type="${entityType}" data-entity-id="${entityId}">
+      <img class="cover-img" src="${src}" alt="${alt}" loading="lazy" />
+      <div class="${overlayClass}">
+        <span class="cover-overlay__text">${placeholderText}</span>
+        <span class="cover-overlay__text subtle">Clique para trocar a capa</span>
+      </div>
+    </figure>
+  `;
+}
+
 function loadPointsLedger(userId, projectId) {
   const key = `msh_points_${userId}_${projectId}`;
   try {
@@ -219,12 +270,61 @@ const ProjectUI = {
     nameEl.textContent = project.name;
     typeEl.textContent = `${project.home_type || 'Tipo'} · ${project.mode || 'macro'}`;
     periodEl.textContent = ProjectDomain.formatPeriod(project.start_date, project.end_date);
-    budgetEl.textContent = project.budget_expected
-      ? `Budget planejado R$ ${project.budget_expected}`
-      : 'Budget não definido';
-    metaEl.innerHTML = `
-      <span class="pill">Progresso ${ProjectDomain.placeholderProgress()}%</span>
-      <span class="pill outline">Budget real ${project.budget_real || 0}</span>
+    const formattedBudget = formatCurrencyBRL(project.budget_expected);
+    budgetEl.textContent = formattedBudget ? `Budget planejado ${formattedBudget}` : 'Budget não definido';
+    ProjectUI.renderHeroIndicators({
+      progressPercent: null,
+      budgetExpected: project.budget_expected,
+      budgetReal: project.budget_real
+    });
+
+    if (coverImg) {
+      coverImg.alt = `Capa do projeto ${project.name || ''}`.trim();
+      let coverSrc = project.cover_url || null;
+      if (!coverSrc && project.cover_path) {
+        coverSrc = await DB.getProjectCoverUrl(project);
+      }
+      if (!coverSrc) {
+        coverSrc = 'assets/img/project_placeholder.jpg';
+      }
+      coverImg.src = coverSrc;
+      coverImg.classList.remove('hidden');
+    }
+    const isPlaceholder = !project.cover_url && !project.cover_path;
+    if (coverShell) {
+      coverShell.classList.toggle('is-placeholder', isPlaceholder);
+    }
+    if (coverOverlayText) {
+      coverOverlayText.textContent = isPlaceholder ? 'Imagem placeholder' : 'Clique para trocar a capa';
+    }
+  },
+
+  renderHeroIndicators({ progressPercent, budgetExpected, budgetReal } = {}) {
+    const meta = document.getElementById('project-meta');
+    if (!meta) return;
+    const hasProgress = typeof progressPercent === 'number' && !Number.isNaN(progressPercent);
+    const cappedProgress = hasProgress ? Math.min(Math.max(progressPercent, 0), 100) : 0;
+    const progressLabel = hasProgress ? `${progressPercent}%` : '—%';
+    const formattedExpected = formatCurrencyBRL(budgetExpected);
+    const formattedReal = formatCurrencyBRL(budgetReal);
+    const plannedLabel = formattedExpected ? `Orçado: ${formattedExpected}` : 'Orçado: —';
+    const spentNumber = Number(budgetReal);
+    const expectedNumber = Number(budgetExpected);
+    const isOverBudget =
+      !Number.isNaN(spentNumber) && !Number.isNaN(expectedNumber) && expectedNumber !== 0 && spentNumber > expectedNumber;
+    const spentLabel = formattedReal ? `Gasto: ${formattedReal}` : 'Gasto: —';
+
+    meta.innerHTML = `
+      <div class="meta-progress">
+        <p class="eyebrow subtle-text">Progresso · <span class="meta-progress__value">${progressLabel}</span></p>
+        <div class="meta-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${cappedProgress}">
+          <span style="width: ${cappedProgress}%"></span>
+        </div>
+      </div>
+      <div class="meta-budget">
+        <p class="muted small budget-line">${plannedLabel}</p>
+        <p class="muted small budget-line ${isOverBudget ? 'budget-over' : ''}">${spentLabel}</p>
+      </div>
     `;
 
     if (coverImg) {
@@ -257,12 +357,23 @@ const ProjectUI = {
     }
     grid.innerHTML = areas
       .map(
-        (area) => `
+        (area) => {
+          const cover = resolveHomeCover(area);
+          const coverFigure = buildCoverFrame({
+            src: cover.src,
+            alt: `Capa do cômodo ${area.name}`,
+            entityType: 'areas',
+            entityId: area.id,
+            isPlaceholder: cover.isPlaceholder,
+            size: 'card'
+          });
+          return `
       <article class="card area-card" data-area-id="${area.id}">
+        ${coverFigure}
         <div class="card-top">
           <div>
             <p class="label">${area.name}</p>
-            <p class="muted">${area.photo_cover_url ? 'Foto adicionada' : 'Sem foto'}</p>
+            <p class="muted">${area.cover_url ? 'Capa adicionada' : 'Sem capa'}</p>
           </div>
           <div class="pill-row slim">
             <span class="pill soft">${area.kind || 'Cômodo'}</span>
@@ -289,8 +400,8 @@ const ProjectUI = {
           </form>
         </div>
       </article>
-    `
-      )
+    `;
+        })
       .join('');
   },
 
@@ -316,27 +427,49 @@ const ProjectUI = {
 
     list.innerHTML = scoped
       .map((sa) => {
+        const subCover = resolveHomeCover(sa);
+        const subCoverFigure = buildCoverFrame({
+          src: subCover.src,
+          alt: `Capa da subárea ${sa.name}`,
+          entityType: 'subareas',
+          entityId: sa.id,
+          isPlaceholder: subCover.isPlaceholder,
+          size: 'nested'
+        });
         const cornersForSub = corners.filter((c) => String(c.sub_area_id) === String(sa.id));
         const cornersList = cornersForSub
-          .map(
-            (c) => `
-              <div class="nested-row">
-                <div>
-                  <p class="label">${c.name}</p>
-                  <p class="muted">${c.description || 'Sem descrição'}</p>
+          .map((c) => {
+            const cornerCover = resolveHomeCover(c);
+            const cornerCoverFigure = buildCoverFrame({
+              src: cornerCover.src,
+              alt: `Capa do canto ${c.name}`,
+              entityType: 'corners',
+              entityId: c.id,
+              isPlaceholder: cornerCover.isPlaceholder,
+              size: 'compact'
+            });
+            return `
+              <article class="nested-card nested-card--corner" data-corner-id="${c.id}">
+                ${cornerCoverFigure}
+                <div class="nested-row">
+                  <div>
+                    <p class="label">${c.name}</p>
+                    <p class="muted">${c.description || 'Sem descrição'}</p>
+                  </div>
+                  <div class="inline-actions">
+                    <span class="badge ghost">Canto</span>
+                    <button class="btn ghost tiny" data-action="edit-corner" data-corner-id="${c.id}">Editar</button>
+                    <button class="btn ghost danger tiny" data-action="delete-corner" data-corner-id="${c.id}">Remover</button>
+                  </div>
                 </div>
-                <div class="inline-actions">
-                  <span class="badge ghost">Canto</span>
-                  <button class="btn ghost tiny" data-action="edit-corner" data-corner-id="${c.id}">Editar</button>
-                  <button class="btn ghost danger tiny" data-action="delete-corner" data-corner-id="${c.id}">Remover</button>
-                </div>
-              </div>
-            `
-          )
+              </article>
+            `;
+          })
           .join('');
 
         return `
           <article class="nested-card" data-sub-area-id="${sa.id}">
+            ${subCoverFigure}
             <div class="nested-row">
               <div>
                 <p class="label">${sa.name}</p>
@@ -514,6 +647,7 @@ const ProjectPage = (window.ProjectPage = window.ProjectPage || {
       subAreaId: null,
       cornerId: null
     },
+    coverUploadContext: null,
     photoModal: {
       taskId: null,
       beforePreview: null,
@@ -600,11 +734,11 @@ const ProjectPage = (window.ProjectPage = window.ProjectPage || {
     }
   },
 
-  async loadProject(projectId) {
-    const { data, error } = await DB.getProjectById(projectId);
-    if (error || !data) {
-      console.error(error);
-      App.showToast('Projeto não encontrado.');
+  async handleEntityCoverFile(file) {
+    if (!file) return;
+    const ctx = this.state.coverUploadContext;
+    if (!ctx || !ctx.entityType || !ctx.entityId) {
+      console.warn('Contexto de upload de capa ausente ou inválido.', ctx);
       return;
     }
     this.state.project = data;
@@ -751,6 +885,11 @@ const ProjectPage = (window.ProjectPage = window.ProjectPage || {
     const points = computeProjectPoints(tasks);
     const deadlines = computeDeadlineIndicators(this.state.project, tasks);
     const budget = computeBudgetIndicators(tasks);
+    ProjectUI.renderHeroIndicators({
+      progressPercent: progress.progressPercent,
+      budgetExpected: this.state.project?.budget_expected,
+      budgetReal: this.state.project?.budget_real
+    });
 
     const cards = [
       { label: 'Progresso do projeto', value: `${progress.progressPercent}%`, caption: `Peso total ${progress.W}` },
@@ -804,6 +943,8 @@ const ProjectPage = (window.ProjectPage = window.ProjectPage || {
 
   bindAreaForm(projectId) {
     const form = document.getElementById('areaForm');
+    const formCard = document.getElementById('area-form-card');
+    const cancelBtn = form?.querySelector('[data-action="cancel-area-form"]');
     if (!form) return;
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -838,7 +979,19 @@ const ProjectPage = (window.ProjectPage = window.ProjectPage || {
         this.state.scopeSelection.areaId = data.id;
         this.syncScopeUI();
       }
+      this.hideAreaForm();
     });
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => this.hideAreaForm());
+    }
+    if (formCard) {
+      formCard.addEventListener('transitionend', () => {
+        if (formCard.classList.contains('hidden')) {
+          formCard.setAttribute('aria-hidden', 'true');
+        }
+      });
+    }
   },
 
   async handleDeleteArea(id, trigger) {
@@ -1176,6 +1329,44 @@ const ProjectPage = (window.ProjectPage = window.ProjectPage || {
     cornerSel.addEventListener('change', syncAndLoad);
   },
 
+  bindAddRoomCard() {
+    const trigger = document.getElementById('add-room-card');
+    const formCard = document.getElementById('area-form-card');
+    if (!trigger || !formCard) return;
+    const openForm = () => {
+      trigger.setAttribute('aria-expanded', 'true');
+      formCard.classList.remove('hidden');
+      formCard.classList.add('is-revealed');
+      formCard.setAttribute('aria-hidden', 'false');
+      const input = formCard.querySelector('#areaName');
+      if (input) input.focus();
+    };
+    trigger.addEventListener('click', openForm);
+    trigger.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        openForm();
+      }
+    });
+  },
+
+  hideAreaForm() {
+    const trigger = document.getElementById('add-room-card');
+    const formCard = document.getElementById('area-form-card');
+    const form = document.getElementById('areaForm');
+    if (formCard) {
+      formCard.classList.add('hidden');
+      formCard.classList.remove('is-revealed');
+      formCard.setAttribute('aria-hidden', 'true');
+    }
+    if (trigger) {
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+    if (form) {
+      form.reset();
+    }
+  },
+
   syncScopeFromUI() {
     const typeSel = document.getElementById('scopeTypeSelect');
     const areaSel = document.getElementById('scopeAreaSelect');
@@ -1310,8 +1501,94 @@ const ProjectPage = (window.ProjectPage = window.ProjectPage || {
   }
 };
 
+async function initProjectPage() {
+  const page = ProjectPage;
+  try {
+    await App.requireAuth();
+    const projectId = new URLSearchParams(window.location.search).get('id');
+    page.state.projectId = projectId;
+    const projectUI = document.querySelector('#projectUI') || document.querySelector('[data-project-ui]');
+    if (!projectUI) {
+      console.error('Container do projeto não encontrado (#projectUI).');
+      return;
+    }
+
+    if (!projectId) {
+      projectUI.innerHTML = `
+        <div class="card">
+          <p class="eyebrow">Projeto inválido</p>
+          <h3>Projeto inválido ou link incompleto</h3>
+          <p class="muted">Reabra a partir da lista de projetos.</p>
+          <a class="btn primary" href="app.html">Voltar para projetos</a>
+        </div>`;
+      return;
+    }
+
+    const { data: project, error } = await DB.getProjectById(projectId);
+    if (error || !project) {
+      console.error('Erro ao carregar projeto', error);
+      projectUI.innerHTML = `
+        <div class="card">
+          <p class="eyebrow">Erro</p>
+          <h3>Não foi possível carregar o projeto</h3>
+          <p class="muted">Tente novamente ou volte para projetos.</p>
+          <a class="btn primary" href="app.html">Voltar para projetos</a>
+        </div>`;
+      return;
+    }
+
+    page.state.project = project;
+    await ProjectUI.renderProjectDetail(project);
+
+    await page.loadAreas(projectId);
+    await page.hydrateSubAreasAndCorners();
+    page.bootstrapScope();
+    await page.loadTasks(projectId);
+    page.bindAreaForm(projectId);
+    page.bindTaskForm(projectId);
+    page.bindAddRoomCard();
+    page.bindScopeSelectors();
+
+    const entityCoverInput = document.getElementById('entity-cover-upload');
+    if (entityCoverInput) {
+      entityCoverInput.addEventListener('change', async (event) => {
+        const file = event.target.files?.[0];
+        if (file) {
+          await page.handleEntityCoverFile(file);
+        }
+        page.state.coverUploadContext = null;
+        entityCoverInput.value = '';
+      });
+    }
+
+    const coverShell = document.getElementById('project-cover-shell');
+    const coverUpload = document.getElementById('project-cover-upload');
+    if (coverShell && coverUpload) {
+      coverShell.addEventListener('click', () => coverUpload.click());
+      coverUpload.addEventListener('change', async (event) => {
+        const file = event.target.files?.[0];
+        if (file) {
+          await page.handleCoverChange(file);
+          coverUpload.value = '';
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao inicializar página do projeto', error);
+    App.showToast('Não foi possível carregar o projeto.');
+  }
+}
+
 // Delegação específica da página de projeto (áreas, subáreas, cantos e tarefas)
 document.addEventListener('click', async (event) => {
+  const changeCoverTarget = event.target.closest('[data-action="change-cover"]');
+  if (changeCoverTarget) {
+    event.preventDefault();
+    const { entityType, entityId } = changeCoverTarget.dataset;
+    ProjectPage.openCoverPicker(entityType, entityId);
+    return;
+  }
+
   const delAreaBtn = event.target.closest('[data-action="delete-area"]');
   if (delAreaBtn) {
     event.preventDefault();
@@ -1407,3 +1684,5 @@ document.addEventListener('submit', async (event) => {
   }
 
 });
+
+window.ProjectPage = ProjectPage;
