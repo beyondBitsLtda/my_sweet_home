@@ -42,7 +42,7 @@ const ProjectDomain = {
     }
     return 'Selecione um escopo';
   }
-});
+};
 
 // Mapeamento único de status: garante que UI/back-end usem os mesmos valores aceitos pelo banco.
 // Sempre normalizeStatus antes de gravar no Supabase.
@@ -326,26 +326,6 @@ const ProjectUI = {
         <p class="muted small budget-line ${isOverBudget ? 'budget-over' : ''}">${spentLabel}</p>
       </div>
     `;
-
-    if (coverImg) {
-      coverImg.alt = `Capa do projeto ${project.name || ''}`.trim();
-      let coverSrc = project.cover_url || null;
-      if (!coverSrc && project.cover_path) {
-        coverSrc = await DB.getProjectCoverUrl(project);
-      }
-      if (!coverSrc) {
-        coverSrc = 'assets/img/project_placeholder.webp';
-      }
-      coverImg.src = coverSrc;
-      coverImg.classList.remove('hidden');
-    }
-    const isPlaceholder = !project.cover_url && !project.cover_path;
-    if (coverShell) {
-      coverShell.classList.toggle('is-placeholder', isPlaceholder);
-    }
-    if (coverOverlayText) {
-      coverOverlayText.textContent = isPlaceholder ? 'Imagem placeholder' : 'Clique para trocar a capa';
-    }
   },
 
   renderAreas(areas) {
