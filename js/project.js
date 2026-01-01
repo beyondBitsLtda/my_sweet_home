@@ -607,6 +607,7 @@ const ProjectPage = {
     await this.loadTasks(projectId);
     this.bindAreaForm(projectId);
     this.bindTaskForm(projectId);
+    this.bindAddRoomCard();
     this.bindScopeSelectors();
 
     const coverShell = document.getElementById('project-cover-shell');
@@ -827,6 +828,8 @@ const ProjectPage = {
 
   bindAreaForm(projectId) {
     const form = document.getElementById('areaForm');
+    const formCard = document.getElementById('area-form-card');
+    const cancelBtn = form?.querySelector('[data-action="cancel-area-form"]');
     if (!form) return;
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -861,7 +864,19 @@ const ProjectPage = {
         this.state.scopeSelection.areaId = data.id;
         this.syncScopeUI();
       }
+      this.hideAreaForm();
     });
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => this.hideAreaForm());
+    }
+    if (formCard) {
+      formCard.addEventListener('transitionend', () => {
+        if (formCard.classList.contains('hidden')) {
+          formCard.setAttribute('aria-hidden', 'true');
+        }
+      });
+    }
   },
 
   async handleDeleteArea(id, trigger) {
@@ -1197,6 +1212,44 @@ const ProjectPage = {
     areaSel.addEventListener('change', syncAndLoad);
     subAreaSel.addEventListener('change', syncAndLoad);
     cornerSel.addEventListener('change', syncAndLoad);
+  },
+
+  bindAddRoomCard() {
+    const trigger = document.getElementById('add-room-card');
+    const formCard = document.getElementById('area-form-card');
+    if (!trigger || !formCard) return;
+    const openForm = () => {
+      trigger.setAttribute('aria-expanded', 'true');
+      formCard.classList.remove('hidden');
+      formCard.classList.add('is-revealed');
+      formCard.setAttribute('aria-hidden', 'false');
+      const input = formCard.querySelector('#areaName');
+      if (input) input.focus();
+    };
+    trigger.addEventListener('click', openForm);
+    trigger.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        openForm();
+      }
+    });
+  },
+
+  hideAreaForm() {
+    const trigger = document.getElementById('add-room-card');
+    const formCard = document.getElementById('area-form-card');
+    const form = document.getElementById('areaForm');
+    if (formCard) {
+      formCard.classList.add('hidden');
+      formCard.classList.remove('is-revealed');
+      formCard.setAttribute('aria-hidden', 'true');
+    }
+    if (trigger) {
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+    if (form) {
+      form.reset();
+    }
   },
 
   syncScopeFromUI() {
