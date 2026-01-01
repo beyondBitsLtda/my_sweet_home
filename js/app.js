@@ -11,7 +11,8 @@ const App = {
     projects: [],
     signupEmailTimer: null,
     signupEmailExists: false,
-    signupEmailCheckToken: null
+    signupEmailCheckToken: null,
+    selectedHomeType: null
   },
 
   // Navegação básica entre páginas HTML estáticas.
@@ -56,6 +57,36 @@ const App = {
     } else {
       loginCard.classList.remove('hidden');
       loggedCard.classList.add('hidden');
+    }
+  },
+
+  /**
+   * setHomeTypeSelection
+   * - Ajusta visualmente os cards de moradia e sincroniza o select do formulário.
+   */
+  setHomeTypeSelection(homeType) {
+    App.state.selectedHomeType = homeType;
+    const homeTypeSelect = document.getElementById('homeType');
+    const createCard = document.getElementById('createProjectCard');
+    const cards = document.querySelectorAll('.home-card');
+
+    cards.forEach((card) => {
+      const isSelected = card.dataset.homeType === homeType;
+      card.classList.toggle('selected', isSelected);
+      const label = card.querySelector('[data-selected-label]');
+      if (label) label.classList.toggle('hidden', !isSelected);
+      if (card.dataset.state === 'disabled' || card.classList.contains('is-disabled')) {
+        card.setAttribute('aria-pressed', 'false');
+      } else {
+        card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+      }
+    });
+
+    if (homeTypeSelect && homeType) {
+      homeTypeSelect.value = homeType;
+    }
+    if (createCard) {
+      createCard.classList.toggle('hidden', !homeType);
     }
   },
 
@@ -508,13 +539,15 @@ const App = {
         const progress = 72;
         const period = proj.start_date && proj.end_date ? `${proj.start_date} · ${proj.end_date}` : 'Sem datas';
         const budget = proj.budget_expected ? `Budget R$ ${proj.budget_expected}` : 'Budget não definido';
-        const coverSrc = proj.cover_url || proj.resolved_cover_url || null;
-        const cover = coverSrc
-          ? `<div class="project-cover-shell">
-              <img class="project-cover" src="${coverSrc}" alt="Capa do projeto ${proj.name}" data-cover-path="${proj.cover_path || ''}" onerror="App.handleCoverError(event)" />
-              <div class="project-cover placeholder hidden"><span class="muted">Sem foto</span></div>
-            </div>`
-          : `<div class="project-cover placeholder"><span class="muted">Sem foto</span></div>`;
+        const coverSrc = proj.cover_url || proj.resolved_cover_url || 'assets/img/project_placeholder.webp';
+        const isPlaceholder = !proj.cover_url && !proj.resolved_cover_url;
+        const cover = `
+          <div class="cover-frame is-card ${isPlaceholder ? 'is-placeholder' : ''}">
+            <img class="cover-img" src="${coverSrc}" alt="Capa do projeto ${proj.name}" data-cover-path="${proj.cover_path || ''}" onerror="App.handleCoverError(event)" />
+            <div class="cover-overlay">
+              <span class="cover-overlay__text">Imagem placeholder</span>
+            </div>
+          </div>`;
         return `
         <article class="card project-card">
           ${cover}
@@ -541,16 +574,15 @@ const App = {
   handleCoverError(event) {
     const img = event?.target;
     if (!img) return;
-    const shell = img.closest('.project-cover-shell');
-    const placeholder = shell?.querySelector('.project-cover.placeholder');
+    const shell = img.closest('.cover-frame');
     const coverPath = img.dataset.coverPath;
 
     // Se já tentamos fallback, mostra placeholder.
     if (img.dataset.signedTried === 'true' || !coverPath) {
       console.warn('Capa do projeto não carregou', img.src);
       img.onerror = null;
-      img.classList.add('hidden');
-      if (placeholder) placeholder.classList.remove('hidden');
+      img.src = 'assets/img/project_placeholder.webp';
+      if (shell) shell.classList.add('is-placeholder');
       return;
     }
 
@@ -643,6 +675,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     await App.requireAuth();
     await App.loadProjects(App.state.user);
 
+    const homeTypeGrid = document.getElementById('homeTypeGrid');
+    const homeTypeSelect = document.getElementById('homeType');
+    const createCard = document.getElementById('createProjectCard');
+
+    if (createCard) createCard.classList.add('hidden');
+    App.setHomeTypeSelection(null);
+
+    if (homeTypeGrid) {
+      homeTypeGrid.addEventListener('click', (event) => {
+        const card = event.target.closest('.home-card');
+        if (!card) return;
+        const type = card.dataset.homeType;
+        const isDisabled = card.classList.contains('is-disabled') || card.dataset.state === 'disabled';
+        if (isDisabled) {
+          App.showToast('Disponível em breve');
+          return;
+        }
+        App.setHomeTypeSelection(type);
+      });
+    }
+
     const createForm = document.getElementById('createProjectForm');
     const coverInput = document.getElementById('projectCoverInput');
     const coverPreview = document.getElementById('projectCoverPreview');
@@ -689,7 +742,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           App.showToast('Faça login para criar projetos.');
           return;
         }
-        const homeType = createForm.home_type.value;
+        if (!App.state.selectedHomeType) {
+          App.showToast('Selecione o tipo de moradia para continuar.');
+          return;
+        }
+        const homeType = App.state.selectedHomeType;
+        if (homeTypeSelect) homeTypeSelect.value = homeType;
         if (homeType !== 'apartment') {
           App.showToast('Disponível em breve. Use Apartamento na V1.');
           return;
