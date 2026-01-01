@@ -218,6 +218,42 @@ const DB = (() => {
     return { session: data?.session ?? null, error };
   }
 
+  async function uploadHomeCover({ userId, projectId, entityType, entityId, file }) {
+    if (!userId || !projectId || !entityType || !entityId || !file) {
+      return { data: null, error: new Error('Parâmetros insuficientes para upload de capa') };
+    }
+    const allowed = ['areas', 'subareas', 'corners'];
+    if (!allowed.includes(entityType)) {
+      return { data: null, error: new Error(`Tipo inválido de entidade para capa: ${entityType}`) };
+    }
+
+    const supabase = initSupabase();
+    const bucket = 'home-covers';
+    const safeExt = (() => {
+      const fromMime = (file.type || '').toLowerCase();
+      if (fromMime.includes('jpeg') || fromMime.includes('jpg')) return 'jpg';
+      if (fromMime.includes('png')) return 'png';
+      if (fromMime.includes('webp')) return 'webp';
+      const nameExt = (file.name || '').split('.').pop();
+      return nameExt ? nameExt.toLowerCase() : 'jpg';
+    })();
+    const path = `${userId}/${projectId}/${entityType}/${entityId}/cover.${safeExt}`;
+    console.info('[home cover] upload', { bucket, path, entityType, entityId });
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' });
+    if (error) {
+      console.error('[home cover] upload error', error);
+      return { data: null, error };
+    }
+
+    const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+    const coverData = { cover_path: path, cover_url: pub?.publicUrl || null };
+    console.info('[home cover] uploaded', coverData);
+    return { data: coverData, error: null };
+  }
+
   /**
    * uploadProjectCover
    * - Envia a imagem de capa para o bucket project-covers.
@@ -344,6 +380,12 @@ const DB = (() => {
     return supabase.from('areas').update(patch).eq('id', areaId).select().single();
   }
 
+  async function updateAreaCover(areaId, cover_path, cover_url) {
+    const supabase = initSupabase();
+    console.info('updateAreaCover', { areaId, cover_path, cover_url });
+    return supabase.from('areas').update({ cover_path, cover_url }).eq('id', areaId).select().single();
+  }
+
   async function deleteArea(areaId) {
     const supabase = initSupabase();
     console.info('deleteArea', areaId);
@@ -375,6 +417,12 @@ const DB = (() => {
     return supabase.from('sub_areas').update(patch).eq('id', subAreaId).select().single();
   }
 
+  async function updateSubareaCover(subAreaId, cover_path, cover_url) {
+    const supabase = initSupabase();
+    console.info('updateSubareaCover', { subAreaId, cover_path, cover_url });
+    return supabase.from('sub_areas').update({ cover_path, cover_url }).eq('id', subAreaId).select().single();
+  }
+
   async function deleteSubArea(subAreaId) {
     const supabase = initSupabase();
     console.info('deleteSubArea', subAreaId);
@@ -404,6 +452,12 @@ const DB = (() => {
     const supabase = initSupabase();
     console.info('updateCorner', cornerId, patch);
     return supabase.from('corners').update(patch).eq('id', cornerId).select().single();
+  }
+
+  async function updateCornerCover(cornerId, cover_path, cover_url) {
+    const supabase = initSupabase();
+    console.info('updateCornerCover', { cornerId, cover_path, cover_url });
+    return supabase.from('corners').update({ cover_path, cover_url }).eq('id', cornerId).select().single();
   }
 
   async function deleteCorner(cornerId) {
@@ -566,6 +620,7 @@ const DB = (() => {
     checkEmailExists,
     authSignOut,
     getSession,
+    uploadHomeCover,
     uploadProjectCover,
     updateProjectCover,
     getSignedProjectCoverUrl,
@@ -579,14 +634,17 @@ const DB = (() => {
     createArea,
     listAreasByProject,
     updateArea,
+    updateAreaCover,
     deleteArea,
     createSubArea,
     listSubAreasByArea,
     updateSubArea,
+    updateSubareaCover,
     deleteSubArea,
     createCorner,
     listCornersBySubArea,
     updateCorner,
+    updateCornerCover,
     deleteCorner,
     createTask,
     updateTask,
