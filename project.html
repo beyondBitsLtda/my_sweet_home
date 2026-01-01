@@ -250,7 +250,15 @@
   <script src="js/project.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
-      await ProjectPage.init();
+      if (window.ProjectPage?.init) {
+        await window.ProjectPage.init();
+        return;
+      }
+      if (typeof window.initProjectPage === 'function') {
+        await window.initProjectPage();
+        return;
+      }
+      console.error('Initializer não encontrado: defina ProjectPage.init ou initProjectPage.');
     });
   </script>
 </body>
