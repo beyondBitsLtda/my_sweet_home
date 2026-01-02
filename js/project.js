@@ -632,6 +632,8 @@ window.ProjectPage = {
     }
   },
 
+  
+
   async init() {
     await App.requireAuth();
     const projectId = new URLSearchParams(window.location.search).get('id');
@@ -1654,6 +1656,45 @@ document.addEventListener('submit', async (event) => {
     await window.ProjectPage.handleCreateCorner(form);
   }
 });
+
+window.ProjectPage = {
+  state: {
+    projectId: null,
+    project: null,
+    projectTasks: [],
+    areas: [],
+    subAreas: [],
+    corners: [],
+    tasks: [],
+    scopeSelection: {
+      type: 'area',
+      areaId: null,
+      subAreaId: null,
+      cornerId: null
+    },
+    coverUploadContext: null,
+    entityCoverInput: null,
+    photoModal: {
+      taskId: null,
+      beforePreview: null,
+      afterPreview: null
+    }
+  },
+
+  // ✅ FIX: garante que "this" sempre aponte para window.ProjectPage,
+// mesmo se algum código chamar init() sem contexto.
+(() => {
+  const page = window.ProjectPage;
+  if (!page || page.__bound__) return;
+
+  Object.keys(page).forEach((key) => {
+    if (typeof page[key] === 'function') {
+      page[key] = page[key].bind(page);
+    }
+  });
+
+  page.__bound__ = true;
+})();
 
 // Exposição global para compatibilidade com chamadas inline.
 (() => {
