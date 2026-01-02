@@ -65,7 +65,7 @@ const STATUS = {
 
 function normalizeStatus(raw) {
   const key = (raw || '').toString().trim().toLowerCase();
-  return Object.prototype.hasOwnProperty.call(STATUS, key) ? STATUS[key] : null;
+  return STATUS.hasOwnProperty(key) ? STATUS[key] : null;
 }
 
 // Mapeamento de peso para o CHECK tasks_weight_check.
@@ -85,38 +85,7 @@ const WEIGHT = {
 
 function normalizeWeight(raw) {
   const key = (raw || '').toString().trim().toLowerCase();
-  return Object.prototype.hasOwnProperty.call(WEIGHT, key) ? WEIGHT[key] : null;
-}
-
-const ENTITY_COVER_PLACEHOLDER = 'assets/img/add_room.jpg';
-
-function resolveEntityCover(entity) {
-  const supabase = DB.initSupabase();
-  if (entity?.cover_url) return { src: entity.cover_url, isPlaceholder: false };
-  if (entity?.cover_path) {
-    const { data } = supabase.storage.from('home-covers').getPublicUrl(entity.cover_path);
-    if (data?.publicUrl) return { src: data.publicUrl, isPlaceholder: false };
-  }
-  return { src: ENTITY_COVER_PLACEHOLDER, isPlaceholder: true };
-}
-
-function buildEntityCoverHTML({ src, isPlaceholder, entityType, entityId, alt, size = 'default' }) {
-  const sizeClass = size === 'compact' ? 'is-compact' : size === 'tight' ? 'is-tight' : '';
-  const overlayText = isPlaceholder
-    ? `
-      <span class="entity-cover-overlay__text">Imagem placeholder</span>
-      <span class="entity-cover-overlay__text subtle">Clique para escolher uma capa</span>
-    `
-    : `<span class="entity-cover-overlay__text">Trocar capa</span>`;
-
-  return `
-    <figure class="entity-cover-frame ${sizeClass} ${isPlaceholder ? 'is-placeholder' : ''}" data-action="pick-entity-cover" data-entity-type="${entityType}" data-entity-id="${entityId}">
-      <img class="entity-cover-img" src="${src}" alt="${alt}" loading="lazy" />
-      <div class="entity-cover-overlay">
-        ${overlayText}
-      </div>
-    </figure>
-  `;
+  return WEIGHT.hasOwnProperty(key) ? WEIGHT[key] : null;
 }
 
 function getWeightValue(raw) {
@@ -330,20 +299,9 @@ const ProjectUI = {
       return;
     }
     grid.innerHTML = areas
-      .map((area) => {
-        const cover = resolveEntityCover(area);
-        const coverHTML = buildEntityCoverHTML({
-          src: cover.src,
-          isPlaceholder: cover.isPlaceholder,
-          entityType: 'areas',
-          entityId: area.id,
-          alt: `Capa do cômodo ${area.name}`
-        });
-        return `
+      .map(
+        (area) => `
       <article class="card area-card" data-area-id="${area.id}">
-        <div class="area-cover-shell">
-          ${coverHTML}
-        </div>
         <div class="card-top">
           <div>
             <p class="label">${area.name}</p>
@@ -374,8 +332,8 @@ const ProjectUI = {
           </form>
         </div>
       </article>
-    `;
-      })
+    `
+      )
       .join('');
   },
 
@@ -401,23 +359,11 @@ const ProjectUI = {
 
     list.innerHTML = scoped
       .map((sa) => {
-        const subAreaCover = resolveEntityCover(sa);
         const cornersForSub = corners.filter((c) => String(c.sub_area_id) === String(sa.id));
         const cornersList = cornersForSub
-          .map((c) => {
-            const cornerCover = resolveEntityCover(c);
-            return `
+          .map(
+            (c) => `
               <div class="nested-row">
-                <div class="corner-cover">
-                  ${buildEntityCoverHTML({
-                    src: cornerCover.src,
-                    isPlaceholder: cornerCover.isPlaceholder,
-                    entityType: 'corners',
-                    entityId: c.id,
-                    alt: `Capa do canto ${c.name}`,
-                    size: 'tight'
-                  })}
-                </div>
                 <div>
                   <p class="label">${c.name}</p>
                   <p class="muted">${c.description || 'Sem descrição'}</p>
@@ -428,22 +374,12 @@ const ProjectUI = {
                   <button class="btn ghost danger tiny" data-action="delete-corner" data-corner-id="${c.id}">Remover</button>
                 </div>
               </div>
-            `;
-          })
+            `
+          )
           .join('');
 
         return `
           <article class="nested-card" data-sub-area-id="${sa.id}">
-            <div class="nested-cover">
-              ${buildEntityCoverHTML({
-                src: subAreaCover.src,
-                isPlaceholder: subAreaCover.isPlaceholder,
-                entityType: 'subareas',
-                entityId: sa.id,
-                alt: `Capa da subárea ${sa.name}`,
-                size: 'compact'
-              })}
-            </div>
             <div class="nested-row">
               <div>
                 <p class="label">${sa.name}</p>
@@ -562,11 +498,9 @@ const ProjectUI = {
               }
               return ProjectDomain.findAreaName(lookups.areas, task.scope_id);
             })();
-
             const metadata = `${scopeBadge} · peso ${task.weight || 'leve'} · custo ${task.cost_expected || 0}`;
-            const hasPhotos = task.has_photo_before || task.photo_before_url;
-            const hasAfter = task.has_photo_after || task.photo_after_url;
-
+        const hasPhotos = task.has_photo_before || task.photo_before_url;
+        const hasAfter = task.has_photo_after || task.photo_after_url;
             return `
               <article class="card kanban-card">
                 <div class="card-top">
@@ -608,7 +542,7 @@ const ProjectUI = {
 /**
  * Fluxos específicos da página de projeto (detalhe).
  */
-window.ProjectPage = {
+const ProjectPage = {
   state: {
     projectId: null,
     project: null,
@@ -623,16 +557,12 @@ window.ProjectPage = {
       subAreaId: null,
       cornerId: null
     },
-    coverUploadContext: null,
-    entityCoverInput: null,
     photoModal: {
       taskId: null,
       beforePreview: null,
       afterPreview: null
     }
   },
-
-  
 
   async init() {
     await App.requireAuth();
@@ -759,13 +689,17 @@ window.ProjectPage = {
 
   async hydrateSubAreasAndCorners() {
     // Carrega subáreas para cada área e na sequência carrega cantos para cada subárea.
-    const subAreasResults = await Promise.all(this.state.areas.map((area) => DB.listSubAreasByArea(area.id)));
+    const subAreasResults = await Promise.all(
+      this.state.areas.map((area) => DB.listSubAreasByArea(area.id))
+    );
     subAreasResults.forEach((res) => {
       if (res.error) console.error('Erro ao carregar subáreas', res.error);
     });
     this.state.subAreas = subAreasResults.flatMap((res) => res.data || []);
 
-    const cornerResults = await Promise.all(this.state.subAreas.map((sa) => DB.listCornersBySubArea(sa.id)));
+    const cornerResults = await Promise.all(
+      this.state.subAreas.map((sa) => DB.listCornersBySubArea(sa.id))
+    );
     cornerResults.forEach((res) => {
       if (res.error) console.error('Erro ao carregar cantos', res.error);
     });
@@ -782,7 +716,12 @@ window.ProjectPage = {
     if (!this.state.scopeSelection.areaId && this.state.areas.length) {
       this.state.scopeSelection.areaId = this.state.areas[0].id;
     }
-    ProjectUI.populateScopeSelectors(this.state.areas, this.state.subAreas, this.state.corners, this.state.scopeSelection);
+    ProjectUI.populateScopeSelectors(
+      this.state.areas,
+      this.state.subAreas,
+      this.state.corners,
+      this.state.scopeSelection
+    );
     ProjectUI.renderScopeSummary(this.state.scopeSelection, this.lookups());
   },
 
@@ -792,119 +731,6 @@ window.ProjectPage = {
       subAreas: this.state.subAreas,
       corners: this.state.corners
     };
-  },
-
-  ensureEntityCoverInput() {
-    if (this.state.entityCoverInput) return this.state.entityCoverInput;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.id = 'entity-cover-upload';
-    input.hidden = true;
-    input.addEventListener('change', async (event) => {
-      const file = event.target.files?.[0];
-      const ctx = this.state.coverUploadContext;
-      if (file && ctx?.entityType && ctx?.entityId) {
-        await this.handleEntityCoverUpload(ctx.entityType, ctx.entityId, file);
-      }
-      input.value = '';
-      this.state.coverUploadContext = null;
-    });
-    document.body.appendChild(input);
-    this.state.entityCoverInput = input;
-    return input;
-  },
-
-  openCoverFileSelector(entityType, entityId) {
-    if (!entityType || !entityId) return;
-    this.state.coverUploadContext = { entityType, entityId };
-    const input = this.ensureEntityCoverInput();
-    if (!input) return;
-    input.value = '';
-    input.click();
-  },
-
-  async handleEntityCoverUpload(entityType, entityId, file) {
-    if (!file) return;
-    const userId = App.state.user?.id;
-    const projectId = this.state.project?.id || this.state.projectId;
-    if (!userId || !projectId) {
-      App.showToast('Sessão expirada. Reabra o projeto.');
-      return;
-    }
-
-    const { data: uploadData, error: uploadError } = await DB.uploadEntityCover({
-      userId,
-      projectId,
-      entityType,
-      entityId,
-      file
-    });
-    if (uploadError || !uploadData) {
-      console.error('Erro ao enviar capa', uploadError);
-      App.showToast('Erro ao enviar capa');
-      return;
-    }
-
-    let updateResult = null;
-    const entityKey = String(entityType || '').toLowerCase();
-    if (entityKey === 'areas') {
-      updateResult = await DB.updateAreaCover(entityId, uploadData.cover_path, uploadData.cover_url);
-    } else if (entityKey === 'subareas') {
-      updateResult = await DB.updateSubareaCover(entityId, uploadData.cover_path, uploadData.cover_url);
-    } else if (entityKey === 'corners') {
-      updateResult = await DB.updateCornerCover(entityId, uploadData.cover_path, uploadData.cover_url);
-    } else {
-      App.showToast('Tipo de capa inválido.');
-      return;
-    }
-
-    if (!updateResult) return;
-    const { data, error } = updateResult;
-    if (error) {
-      console.error('Erro ao salvar capa', error);
-      App.showToast('Imagem enviada, mas não vinculada (verifique colunas cover_path/cover_url e RLS)');
-      return;
-    }
-
-    const nextCover = {
-      cover_url: data?.cover_url || uploadData.cover_url || null,
-      cover_path: data?.cover_path || uploadData.cover_path || null
-    };
-
-    if (entityKey === 'areas') {
-      this.state.areas = this.state.areas.map((area) =>
-        String(area.id) === String(entityId) ? { ...area, ...data, ...nextCover } : area
-      );
-      ProjectUI.renderAreas(this.state.areas);
-      this.state.areas.forEach((area) => ProjectUI.renderSubAreas(area.id, this.state.subAreas, this.state.corners));
-    }
-
-    if (entityKey === 'subareas') {
-      const parentAreaId = this.findAreaIdBySubArea(entityId);
-      this.state.subAreas = this.state.subAreas.map((sa) =>
-        String(sa.id) === String(entityId) ? { ...sa, ...data, ...nextCover } : sa
-      );
-      if (parentAreaId) {
-        ProjectUI.renderSubAreas(parentAreaId, this.state.subAreas, this.state.corners);
-      }
-    }
-
-    if (entityKey === 'corners') {
-      const targetCorner = this.state.corners.find((c) => String(c.id) === String(entityId));
-      const parentSubAreaId = targetCorner?.sub_area_id || data?.sub_area_id || null;
-      this.state.corners = this.state.corners.map((c) =>
-        String(c.id) === String(entityId) ? { ...c, ...data, ...nextCover } : c
-      );
-      if (parentSubAreaId) {
-        const parentAreaId = this.findAreaIdBySubArea(parentSubAreaId);
-        if (parentAreaId) {
-          ProjectUI.renderSubAreas(parentAreaId, this.state.subAreas, this.state.corners);
-        }
-      }
-    }
-
-    App.showToast('Capa atualizada.');
   },
 
   currentScopeFilter() {
@@ -1090,7 +916,9 @@ window.ProjectPage = {
     }
     this.state.areas = this.state.areas.map((a) => (String(a.id) === String(id) ? data : a));
     ProjectUI.renderAreas(this.state.areas);
-    this.state.areas.forEach((areaItem) => ProjectUI.renderSubAreas(areaItem.id, this.state.subAreas, this.state.corners));
+    this.state.areas.forEach((areaItem) =>
+      ProjectUI.renderSubAreas(areaItem.id, this.state.subAreas, this.state.corners)
+    );
     this.syncScopeUI();
     App.showToast('Cômodo atualizado.');
   },
@@ -1357,7 +1185,9 @@ window.ProjectPage = {
       status: normalizeStatus(data.status || task.status) || 'todo',
       weight: normalizeWeight(data.weight || task.weight) || 'medium'
     };
-    this.state.projectTasks = this.state.projectTasks.map((t) => (String(t.id) === String(taskId) ? normalized : t));
+    this.state.projectTasks = this.state.projectTasks.map((t) =>
+      String(t.id) === String(taskId) ? normalized : t
+    );
     this.applyScopeFilter();
     this.updateDashboard();
     this.closePhotoModal();
@@ -1455,7 +1285,9 @@ window.ProjectPage = {
         nextScope.subAreaId = first?.id || null;
       }
       if (!nextScope.cornerId && nextScope.subAreaId) {
-        const firstCorner = this.state.corners.find((c) => String(c.sub_area_id) === String(nextScope.subAreaId));
+        const firstCorner = this.state.corners.find(
+          (c) => String(c.sub_area_id) === String(nextScope.subAreaId)
+        );
         nextScope.cornerId = firstCorner?.id || null;
       }
     }
@@ -1465,7 +1297,12 @@ window.ProjectPage = {
   },
 
   syncScopeUI() {
-    ProjectUI.populateScopeSelectors(this.state.areas, this.state.subAreas, this.state.corners, this.state.scopeSelection);
+    ProjectUI.populateScopeSelectors(
+      this.state.areas,
+      this.state.subAreas,
+      this.state.corners,
+      this.state.scopeSelection
+    );
     ProjectUI.renderScopeSummary(this.state.scopeSelection, this.lookups());
   },
 
@@ -1519,7 +1356,9 @@ window.ProjectPage = {
       status: normalizeStatus(data.status) || mappedStatus,
       weight: normalizeWeight(data.weight) || 'medium'
     };
-    this.state.projectTasks = this.state.projectTasks.map((t) => (String(t.id) === String(id) ? normalized : t));
+    this.state.projectTasks = this.state.projectTasks.map((t) =>
+      String(t.id) === String(id) ? normalized : t
+    );
     this.applyScopeFilter();
     this.updateDashboard();
 
@@ -1549,20 +1388,11 @@ window.ProjectPage = {
 
 // Delegação específica da página de projeto (áreas, subáreas, cantos e tarefas)
 document.addEventListener('click', async (event) => {
-  const coverTrigger = event.target.closest('[data-action="pick-entity-cover"]');
-  if (coverTrigger) {
-    event.preventDefault();
-    const type = coverTrigger.dataset.entityType;
-    const id = coverTrigger.dataset.entityId;
-    window.ProjectPage.openCoverFileSelector(type, id);
-    return;
-  }
-
   const delAreaBtn = event.target.closest('[data-action="delete-area"]');
   if (delAreaBtn) {
     event.preventDefault();
     const id = delAreaBtn.dataset.areaId;
-    await window.ProjectPage.handleDeleteArea(id, delAreaBtn);
+    await ProjectPage.handleDeleteArea(id, delAreaBtn);
     return;
   }
 
@@ -1570,7 +1400,7 @@ document.addEventListener('click', async (event) => {
   if (editAreaBtn) {
     event.preventDefault();
     const id = editAreaBtn.dataset.areaId;
-    await window.ProjectPage.handleEditArea(id);
+    await ProjectPage.handleEditArea(id);
     return;
   }
 
@@ -1585,14 +1415,14 @@ document.addEventListener('click', async (event) => {
   const editSubAreaBtn = event.target.closest('[data-action="edit-sub-area"]');
   if (editSubAreaBtn) {
     event.preventDefault();
-    await window.ProjectPage.handleEditSubArea(editSubAreaBtn.dataset.subAreaId);
+    await ProjectPage.handleEditSubArea(editSubAreaBtn.dataset.subAreaId);
     return;
   }
 
   const deleteSubAreaBtn = event.target.closest('[data-action="delete-sub-area"]');
   if (deleteSubAreaBtn) {
     event.preventDefault();
-    await window.ProjectPage.handleDeleteSubArea(deleteSubAreaBtn.dataset.subAreaId);
+    await ProjectPage.handleDeleteSubArea(deleteSubAreaBtn.dataset.subAreaId);
     return;
   }
 
@@ -1606,14 +1436,14 @@ document.addEventListener('click', async (event) => {
   const editCornerBtn = event.target.closest('[data-action="edit-corner"]');
   if (editCornerBtn) {
     event.preventDefault();
-    await window.ProjectPage.handleEditCorner(editCornerBtn.dataset.cornerId);
+    await ProjectPage.handleEditCorner(editCornerBtn.dataset.cornerId);
     return;
   }
 
   const deleteCornerBtn = event.target.closest('[data-action="delete-corner"]');
   if (deleteCornerBtn) {
     event.preventDefault();
-    await window.ProjectPage.handleDeleteCorner(deleteCornerBtn.dataset.cornerId);
+    await ProjectPage.handleDeleteCorner(deleteCornerBtn.dataset.cornerId);
     return;
   }
 
@@ -1622,21 +1452,20 @@ document.addEventListener('click', async (event) => {
     event.preventDefault();
     const id = moveBtn.dataset.taskId;
     const dir = moveBtn.dataset.direction;
-    await window.ProjectPage.handleMoveTask(id, dir);
-    return;
+    await ProjectPage.handleMoveTask(id, dir);
   }
 
   const photosBtn = event.target.closest('[data-action="open-photos"]');
   if (photosBtn) {
     event.preventDefault();
-    window.ProjectPage.openPhotoModal(photosBtn.dataset.taskId);
+    ProjectPage.openPhotoModal(photosBtn.dataset.taskId);
     return;
   }
 
   const savePhotosBtn = event.target.closest('[data-action="save-photos"]');
   if (savePhotosBtn) {
     event.preventDefault();
-    await window.ProjectPage.savePhotoFlags(savePhotosBtn);
+    await ProjectPage.savePhotoFlags(savePhotosBtn);
   }
 });
 
@@ -1644,68 +1473,13 @@ document.addEventListener('submit', async (event) => {
   const form = event.target;
   const action = form?.dataset?.action;
   if (!action) return;
-
   if (action === 'create-sub-area') {
     event.preventDefault();
-    await window.ProjectPage.handleCreateSubArea(form);
-    return;
+    await ProjectPage.handleCreateSubArea(form);
   }
-
   if (action === 'create-corner') {
     event.preventDefault();
-    await window.ProjectPage.handleCreateCorner(form);
+    await ProjectPage.handleCreateCorner(form);
   }
+
 });
-
-window.ProjectPage = {
-  state: {
-    projectId: null,
-    project: null,
-    projectTasks: [],
-    areas: [],
-    subAreas: [],
-    corners: [],
-    tasks: [],
-    scopeSelection: {
-      type: 'area',
-      areaId: null,
-      subAreaId: null,
-      cornerId: null
-    },
-    coverUploadContext: null,
-    entityCoverInput: null,
-    photoModal: {
-      taskId: null,
-      beforePreview: null,
-      afterPreview: null
-    }
-  },
-
-  // ✅ FIX: garante que "this" sempre aponte para window.ProjectPage,
-// mesmo se algum código chamar init() sem contexto.
-(() => {
-  const page = window.ProjectPage;
-  if (!page || page.__bound__) return;
-
-  Object.keys(page).forEach((key) => {
-    if (typeof page[key] === 'function') {
-      page[key] = page[key].bind(page);
-    }
-  });
-
-  page.__bound__ = true;
-})();
-
-// Exposição global para compatibilidade com chamadas inline.
-(() => {
-  const initProjectPage = (...args) => window.ProjectPage.init(...args);
-
-  window.ProjectPage = window.ProjectPage || {};
-  if (!window.ProjectPage.init) {
-    window.ProjectPage.init = initProjectPage;
-  }
-  if (!window.initProjectPage) {
-    window.initProjectPage = initProjectPage;
-  }
-  window.dispatchEvent(new Event('ProjectPageReady'));
-})();

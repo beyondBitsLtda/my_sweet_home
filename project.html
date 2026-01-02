@@ -244,43 +244,14 @@
      
     </div>
   </div>
+
   <script src="js/app.js"></script>
   <script src="js/db.js"></script>
   <script src="js/project.js"></script>
-    <script>
-  document.addEventListener('DOMContentLoaded', async () => {
-    const tryInit = async () => {
-      const page = window.ProjectPage;
-      const initializer = page?.init || window.initProjectPage;
-
-      if (typeof initializer === 'function') {
-        // ✅ garante que "this" seja ProjectPage
-        await initializer.call(page);
-        return true;
-      }
-      return false;
-    };
-
-    if (await tryInit()) return;
-
-    const onReady = async () => {
-      if (await tryInit()) {
-        window.removeEventListener('ProjectPageReady', onReady);
-      }
-    };
-
-    window.addEventListener('ProjectPageReady', onReady);
-
-    setTimeout(async () => {
-      const initialized = await tryInit();
-      if (initialized) {
-        window.removeEventListener('ProjectPageReady', onReady);
-        return;
-      }
-      console.error('Initializer não encontrado: defina ProjectPage.init ou initProjectPage.');
-    }, 50);
-  });
-</script>
-
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      await ProjectPage.init();
+    });
+  </script>
 </body>
 </html>

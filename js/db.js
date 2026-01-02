@@ -250,54 +250,6 @@ const DB = (() => {
     return { data: { cover_path: path, cover_url: pub?.publicUrl || null }, error: null };
   }
 
-  async function uploadEntityCover({ userId, projectId, entityType, entityId, file }) {
-    if (!file) return { data: null, error: null };
-    const supabase = initSupabase();
-    const bucket = 'home-covers';
-    const path = `${userId}/${projectId}/${entityType}/${entityId}/cover.jpg`;
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg', cacheControl: '3600' });
-    if (error) {
-      console.error('[entity cover] upload error', error);
-      return { data: null, error };
-    }
-
-    const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
-    return { data: { cover_path: path, cover_url: pub?.publicUrl || null }, error: null };
-  }
-
-  async function updateAreaCover(areaId, cover_path, cover_url) {
-    const supabase = initSupabase();
-    return supabase
-      .from('areas')
-      .update({ cover_path, cover_url })
-      .eq('id', areaId)
-      .select()
-      .single();
-  }
-
-  async function updateSubareaCover(subAreaId, cover_path, cover_url) {
-    const supabase = initSupabase();
-    return supabase
-      .from('sub_areas')
-      .update({ cover_path, cover_url })
-      .eq('id', subAreaId)
-      .select()
-      .single();
-  }
-
-  async function updateCornerCover(cornerId, cover_path, cover_url) {
-    const supabase = initSupabase();
-    return supabase
-      .from('corners')
-      .update({ cover_path, cover_url })
-      .eq('id', cornerId)
-      .select()
-      .single();
-  }
-
   async function updateProjectCover(projectId, userId, coverUrl, coverPath) {
     const supabase = initSupabase();
     const payload = {};
@@ -618,10 +570,6 @@ const DB = (() => {
     updateProjectCover,
     getSignedProjectCoverUrl,
     getProjectCoverUrl,
-    uploadEntityCover,
-    updateAreaCover,
-    updateSubareaCover,
-    updateCornerCover,
     onAuthStateChange,
     upsertProfile,
     createProject,
