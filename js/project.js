@@ -65,7 +65,7 @@ const STATUS = {
 
 function normalizeStatus(raw) {
   const key = (raw || '').toString().trim().toLowerCase();
-  return STATUS.hasOwnProperty(key) ? STATUS[key] : null;
+  return Object.prototype.hasOwnProperty.call(STATUS, key) ? STATUS[key] : null;
 }
 
 // Mapeamento de peso para o CHECK tasks_weight_check.
@@ -85,7 +85,7 @@ const WEIGHT = {
 
 function normalizeWeight(raw) {
   const key = (raw || '').toString().trim().toLowerCase();
-  return WEIGHT.hasOwnProperty(key) ? WEIGHT[key] : null;
+  return Object.prototype.hasOwnProperty.call(WEIGHT, key) ? WEIGHT[key] : null;
 }
 
 const ENTITY_COVER_PLACEHOLDER = 'assets/img/add_room.jpg';
@@ -404,10 +404,9 @@ const ProjectUI = {
         const subAreaCover = resolveEntityCover(sa);
         const cornersForSub = corners.filter((c) => String(c.sub_area_id) === String(sa.id));
         const cornersList = cornersForSub
-          .map(
-            (c) => {
-              const cornerCover = resolveEntityCover(c);
-              return `
+          .map((c) => {
+            const cornerCover = resolveEntityCover(c);
+            return `
               <div class="nested-row">
                 <div class="corner-cover">
                   ${buildEntityCoverHTML({
@@ -415,7 +414,7 @@ const ProjectUI = {
                     isPlaceholder: cornerCover.isPlaceholder,
                     entityType: 'corners',
                     entityId: c.id,
-                    alt: \`Capa do canto ${c.name}\`,
+                    alt: `Capa do canto ${c.name}`,
                     size: 'tight'
                   })}
                 </div>
@@ -430,8 +429,7 @@ const ProjectUI = {
                 </div>
               </div>
             `;
-            }
-          )
+          })
           .join('');
 
         return `
@@ -442,7 +440,7 @@ const ProjectUI = {
                 isPlaceholder: subAreaCover.isPlaceholder,
                 entityType: 'subareas',
                 entityId: sa.id,
-                alt: \`Capa da subárea ${sa.name}\`,
+                alt: `Capa da subárea ${sa.name}`,
                 size: 'compact'
               })}
             </div>
@@ -564,9 +562,11 @@ const ProjectUI = {
               }
               return ProjectDomain.findAreaName(lookups.areas, task.scope_id);
             })();
+
             const metadata = `${scopeBadge} · peso ${task.weight || 'leve'} · custo ${task.cost_expected || 0}`;
-        const hasPhotos = task.has_photo_before || task.photo_before_url;
-        const hasAfter = task.has_photo_after || task.photo_after_url;
+            const hasPhotos = task.has_photo_before || task.photo_before_url;
+            const hasAfter = task.has_photo_after || task.photo_after_url;
+
             return `
               <article class="card kanban-card">
                 <div class="card-top">
@@ -757,17 +757,13 @@ window.ProjectPage = {
 
   async hydrateSubAreasAndCorners() {
     // Carrega subáreas para cada área e na sequência carrega cantos para cada subárea.
-    const subAreasResults = await Promise.all(
-      this.state.areas.map((area) => DB.listSubAreasByArea(area.id))
-    );
+    const subAreasResults = await Promise.all(this.state.areas.map((area) => DB.listSubAreasByArea(area.id)));
     subAreasResults.forEach((res) => {
       if (res.error) console.error('Erro ao carregar subáreas', res.error);
     });
     this.state.subAreas = subAreasResults.flatMap((res) => res.data || []);
 
-    const cornerResults = await Promise.all(
-      this.state.subAreas.map((sa) => DB.listCornersBySubArea(sa.id))
-    );
+    const cornerResults = await Promise.all(this.state.subAreas.map((sa) => DB.listCornersBySubArea(sa.id)));
     cornerResults.forEach((res) => {
       if (res.error) console.error('Erro ao carregar cantos', res.error);
     });
@@ -784,12 +780,7 @@ window.ProjectPage = {
     if (!this.state.scopeSelection.areaId && this.state.areas.length) {
       this.state.scopeSelection.areaId = this.state.areas[0].id;
     }
-    ProjectUI.populateScopeSelectors(
-      this.state.areas,
-      this.state.subAreas,
-      this.state.corners,
-      this.state.scopeSelection
-    );
+    ProjectUI.populateScopeSelectors(this.state.areas, this.state.subAreas, this.state.corners, this.state.scopeSelection);
     ProjectUI.renderScopeSummary(this.state.scopeSelection, this.lookups());
   },
 
@@ -1097,9 +1088,7 @@ window.ProjectPage = {
     }
     this.state.areas = this.state.areas.map((a) => (String(a.id) === String(id) ? data : a));
     ProjectUI.renderAreas(this.state.areas);
-    this.state.areas.forEach((areaItem) =>
-      ProjectUI.renderSubAreas(areaItem.id, this.state.subAreas, this.state.corners)
-    );
+    this.state.areas.forEach((areaItem) => ProjectUI.renderSubAreas(areaItem.id, this.state.subAreas, this.state.corners));
     this.syncScopeUI();
     App.showToast('Cômodo atualizado.');
   },
@@ -1366,9 +1355,7 @@ window.ProjectPage = {
       status: normalizeStatus(data.status || task.status) || 'todo',
       weight: normalizeWeight(data.weight || task.weight) || 'medium'
     };
-    this.state.projectTasks = this.state.projectTasks.map((t) =>
-      String(t.id) === String(taskId) ? normalized : t
-    );
+    this.state.projectTasks = this.state.projectTasks.map((t) => (String(t.id) === String(taskId) ? normalized : t));
     this.applyScopeFilter();
     this.updateDashboard();
     this.closePhotoModal();
@@ -1466,9 +1453,7 @@ window.ProjectPage = {
         nextScope.subAreaId = first?.id || null;
       }
       if (!nextScope.cornerId && nextScope.subAreaId) {
-        const firstCorner = this.state.corners.find(
-          (c) => String(c.sub_area_id) === String(nextScope.subAreaId)
-        );
+        const firstCorner = this.state.corners.find((c) => String(c.sub_area_id) === String(nextScope.subAreaId));
         nextScope.cornerId = firstCorner?.id || null;
       }
     }
@@ -1478,12 +1463,7 @@ window.ProjectPage = {
   },
 
   syncScopeUI() {
-    ProjectUI.populateScopeSelectors(
-      this.state.areas,
-      this.state.subAreas,
-      this.state.corners,
-      this.state.scopeSelection
-    );
+    ProjectUI.populateScopeSelectors(this.state.areas, this.state.subAreas, this.state.corners, this.state.scopeSelection);
     ProjectUI.renderScopeSummary(this.state.scopeSelection, this.lookups());
   },
 
@@ -1537,9 +1517,7 @@ window.ProjectPage = {
       status: normalizeStatus(data.status) || mappedStatus,
       weight: normalizeWeight(data.weight) || 'medium'
     };
-    this.state.projectTasks = this.state.projectTasks.map((t) =>
-      String(t.id) === String(id) ? normalized : t
-    );
+    this.state.projectTasks = this.state.projectTasks.map((t) => (String(t.id) === String(id) ? normalized : t));
     this.applyScopeFilter();
     this.updateDashboard();
 
@@ -1574,7 +1552,7 @@ document.addEventListener('click', async (event) => {
     event.preventDefault();
     const type = coverTrigger.dataset.entityType;
     const id = coverTrigger.dataset.entityId;
-    ProjectPage.openCoverFileSelector(type, id);
+    window.ProjectPage.openCoverFileSelector(type, id);
     return;
   }
 
@@ -1582,7 +1560,7 @@ document.addEventListener('click', async (event) => {
   if (delAreaBtn) {
     event.preventDefault();
     const id = delAreaBtn.dataset.areaId;
-    await ProjectPage.handleDeleteArea(id, delAreaBtn);
+    await window.ProjectPage.handleDeleteArea(id, delAreaBtn);
     return;
   }
 
@@ -1590,7 +1568,7 @@ document.addEventListener('click', async (event) => {
   if (editAreaBtn) {
     event.preventDefault();
     const id = editAreaBtn.dataset.areaId;
-    await ProjectPage.handleEditArea(id);
+    await window.ProjectPage.handleEditArea(id);
     return;
   }
 
@@ -1605,14 +1583,14 @@ document.addEventListener('click', async (event) => {
   const editSubAreaBtn = event.target.closest('[data-action="edit-sub-area"]');
   if (editSubAreaBtn) {
     event.preventDefault();
-    await ProjectPage.handleEditSubArea(editSubAreaBtn.dataset.subAreaId);
+    await window.ProjectPage.handleEditSubArea(editSubAreaBtn.dataset.subAreaId);
     return;
   }
 
   const deleteSubAreaBtn = event.target.closest('[data-action="delete-sub-area"]');
   if (deleteSubAreaBtn) {
     event.preventDefault();
-    await ProjectPage.handleDeleteSubArea(deleteSubAreaBtn.dataset.subAreaId);
+    await window.ProjectPage.handleDeleteSubArea(deleteSubAreaBtn.dataset.subAreaId);
     return;
   }
 
@@ -1626,14 +1604,14 @@ document.addEventListener('click', async (event) => {
   const editCornerBtn = event.target.closest('[data-action="edit-corner"]');
   if (editCornerBtn) {
     event.preventDefault();
-    await ProjectPage.handleEditCorner(editCornerBtn.dataset.cornerId);
+    await window.ProjectPage.handleEditCorner(editCornerBtn.dataset.cornerId);
     return;
   }
 
   const deleteCornerBtn = event.target.closest('[data-action="delete-corner"]');
   if (deleteCornerBtn) {
     event.preventDefault();
-    await ProjectPage.handleDeleteCorner(deleteCornerBtn.dataset.cornerId);
+    await window.ProjectPage.handleDeleteCorner(deleteCornerBtn.dataset.cornerId);
     return;
   }
 
@@ -1642,20 +1620,21 @@ document.addEventListener('click', async (event) => {
     event.preventDefault();
     const id = moveBtn.dataset.taskId;
     const dir = moveBtn.dataset.direction;
-    await ProjectPage.handleMoveTask(id, dir);
+    await window.ProjectPage.handleMoveTask(id, dir);
+    return;
   }
 
   const photosBtn = event.target.closest('[data-action="open-photos"]');
   if (photosBtn) {
     event.preventDefault();
-    ProjectPage.openPhotoModal(photosBtn.dataset.taskId);
+    window.ProjectPage.openPhotoModal(photosBtn.dataset.taskId);
     return;
   }
 
   const savePhotosBtn = event.target.closest('[data-action="save-photos"]');
   if (savePhotosBtn) {
     event.preventDefault();
-    await ProjectPage.savePhotoFlags(savePhotosBtn);
+    await window.ProjectPage.savePhotoFlags(savePhotosBtn);
   }
 });
 
@@ -1663,21 +1642,24 @@ document.addEventListener('submit', async (event) => {
   const form = event.target;
   const action = form?.dataset?.action;
   if (!action) return;
+
   if (action === 'create-sub-area') {
     event.preventDefault();
-    await ProjectPage.handleCreateSubArea(form);
-  }
-  if (action === 'create-corner') {
-    event.preventDefault();
-    await ProjectPage.handleCreateCorner(form);
+    await window.ProjectPage.handleCreateSubArea(form);
+    return;
   }
 
+  if (action === 'create-corner') {
+    event.preventDefault();
+    await window.ProjectPage.handleCreateCorner(form);
+  }
 });
 
 // Exposição global para compatibilidade com chamadas inline.
 (() => {
-  const initProjectPage = (...args) => ProjectPage.init(...args);
-  window.ProjectPage = window.ProjectPage || ProjectPage;
+  const initProjectPage = (...args) => window.ProjectPage.init(...args);
+
+  window.ProjectPage = window.ProjectPage || {};
   if (!window.ProjectPage.init) {
     window.ProjectPage.init = initProjectPage;
   }
