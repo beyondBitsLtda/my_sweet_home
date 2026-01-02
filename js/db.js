@@ -235,7 +235,7 @@ const DB = (() => {
       return null;
     })();
     const ext = (nameExt || mimeExt || 'jpg').toLowerCase();
-    const path = `${userId}/${projectId}/cover.${ext}`;
+    const path = `projects/${projectId}/areas/${areaId}/cover.jpg`;
     console.log('[cover] bucket/path', { bucket, path });
 
     const { data, error } = await supabase.storage
