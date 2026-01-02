@@ -534,24 +534,48 @@ const DB = (() => {
   }
 
   async function uploadAreaCover(file, projectId, areaId) {
-    if (!file || !projectId || !areaId) return { data: null, error: new Error('Parâmetros inválidos para upload da capa') };
-    const supabase = initSupabase();
-    const bucket = 'home-covers';
-    const path = `projects/${projectId}/areas/${areaId}.jpg`;
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg', cacheControl: '3600' });
-
-    if (error) return { data: null, error };
-    const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(path);
-    return {
-      data: {
-        cover_path: path,
-        cover_url: publicData?.publicUrl || null
-      },
-      error: null
-    };
+  if (!file || !projectId || !areaId) {
+    return { data: null, error: new Error('Parâmetros inválidos para upload da capa') };
   }
+
+  const supabase = initSupabase();
+
+  // 1️⃣ garantir usuário autenticado
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user?.id) {
+    return { data: null, error: new Error('Usuário não autenticado') };
+  }
+
+  const userId = session.user.id;
+  const bucket = 'home-covers';
+
+  // 2️⃣ path COMPATÍVEL com RLS
+  const path = `${userId}/projects/${projectId}/areas/${areaId}.jpg`;
+
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .upload(path, file, {
+      upsert: true,
+      contentType: file.type || 'image/jpeg',
+      cacheControl: '3600'
+    });
+
+  if (error) return { data: null, error };
+
+  const { data: publicData } = supabase
+    .storage
+    .from(bucket)
+    .getPublicUrl(path);
+
+  return {
+    data: {
+      cover_path: path,
+      cover_url: publicData?.publicUrl || null
+    },
+    error: null
+  };
+}
+
 
   async function updateAreaCover(areaId, cover_path, cover_url) {
     if (!areaId) return { data: null, error: new Error('Área inválida') };
