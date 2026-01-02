@@ -608,7 +608,7 @@ const ProjectUI = {
 /**
  * Fluxos específicos da página de projeto (detalhe).
  */
-const ProjectPage = {
+window.ProjectPage = {
   state: {
     projectId: null,
     project: null,
