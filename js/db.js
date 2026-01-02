@@ -526,6 +526,43 @@ const DB = (() => {
       .eq('user_id', userId);
   }
 
+  function getAreaCoverPublicUrl(coverPath) {
+    if (!coverPath) return null;
+    const supabase = initSupabase();
+    const { data } = supabase.storage.from('home-covers').getPublicUrl(coverPath);
+    return data?.publicUrl || null;
+  }
+
+  async function uploadAreaCover(file, projectId, areaId) {
+    if (!file || !projectId || !areaId) return { data: null, error: new Error('Parâmetros inválidos para upload da capa') };
+    const supabase = initSupabase();
+    const bucket = 'home-covers';
+    const path = `projects/${projectId}/areas/${areaId}.jpg`;
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg', cacheControl: '3600' });
+
+    if (error) return { data: null, error };
+    const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(path);
+    return {
+      data: {
+        cover_path: path,
+        cover_url: publicData?.publicUrl || null
+      },
+      error: null
+    };
+  }
+
+  async function updateAreaCover(areaId, cover_path, cover_url) {
+    if (!areaId) return { data: null, error: new Error('Área inválida') };
+    const supabase = initSupabase();
+    const payload = {};
+    if (typeof cover_path !== 'undefined') payload.cover_path = cover_path;
+    if (typeof cover_url !== 'undefined') payload.cover_url = cover_url;
+
+    return supabase.from('areas').update(payload).eq('id', areaId).select().single();
+  }
+
   /**
    * Escuta mudanças de autenticação.
    * - Ideal para reagir a magic link ou logout em múltiplas abas.
@@ -570,6 +607,7 @@ const DB = (() => {
     updateProjectCover,
     getSignedProjectCoverUrl,
     getProjectCoverUrl,
+    getAreaCoverPublicUrl,
     onAuthStateChange,
     upsertProfile,
     createProject,
@@ -595,6 +633,8 @@ const DB = (() => {
     updateTaskStatus,
     updateUserLifetimePoints,
     updateTaskPhotos,
+    uploadAreaCover,
+    updateAreaCover,
     normalizeStatus,
     normalizeWeight,
     buildTaskPayload

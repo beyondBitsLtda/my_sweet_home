@@ -300,8 +300,17 @@ const ProjectUI = {
     }
     grid.innerHTML = areas
       .map(
-        (area) => `
+        (area) => {
+          const coverUrl = area.cover_url || area.resolved_cover_url || 'assets/img/add_room.jpg';
+          const isPlaceholder = !area.cover_url && !area.resolved_cover_url && !area.cover_path;
+          return `
       <article class="card area-card" data-area-id="${area.id}">
+        <div class="cover-frame is-card area-cover ${isPlaceholder ? 'is-placeholder' : ''}" data-action="area-cover" data-area-id="${area.id}">
+          <img class="cover-img" src="${coverUrl}" alt="Capa do cômodo ${area.name}" loading="lazy" />
+          <div class="cover-overlay">
+            <span class="cover-overlay__text">${isPlaceholder ? 'Clique para adicionar capa' : 'Clique para trocar a capa'}</span>
+          </div>
+        </div>
         <div class="card-top">
           <div>
             <p class="label">${area.name}</p>
@@ -332,7 +341,8 @@ const ProjectUI = {
           </form>
         </div>
       </article>
-    `
+    `;
+        }
       )
       .join('');
   },
@@ -551,6 +561,10 @@ const ProjectPage = {
     subAreas: [],
     corners: [],
     tasks: [],
+    areaCoverUpload: {
+      areaId: null,
+      input: null
+    },
     scopeSelection: {
       type: 'area',
       areaId: null,
@@ -601,6 +615,7 @@ const ProjectPage = {
     this.state.project = project;
     await ProjectUI.renderProjectDetail(project);
 
+    this.ensureAreaCoverInput();
     await this.loadAreas(projectId);
     await this.hydrateSubAreasAndCorners();
     this.bootstrapScope();
@@ -633,6 +648,65 @@ const ProjectPage = {
     }
     this.state.project = data;
     await ProjectUI.renderProjectDetail(data);
+  },
+
+  ensureAreaCoverInput() {
+    if (this.state.areaCoverUpload.input) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg,image/png,image/webp,image/jpg';
+    input.classList.add('hidden');
+    input.id = 'area-cover-input';
+    input.addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      const targetAreaId = this.state.areaCoverUpload.areaId;
+      event.target.value = '';
+      if (!file || !targetAreaId) return;
+      await this.handleAreaCoverFile(file, targetAreaId);
+    });
+    document.body.appendChild(input);
+    this.state.areaCoverUpload.input = input;
+  },
+
+  async handleAreaCoverClick(areaId) {
+    if (!areaId) return;
+    if (!this.state.projectId) {
+      App.showToast('Projeto não carregado.');
+      return;
+    }
+    const areaExists = this.state.areas.some((a) => String(a.id) === String(areaId));
+    if (!areaExists) return;
+    this.state.areaCoverUpload.areaId = areaId;
+    this.state.areaCoverUpload.input?.click();
+  },
+
+  async handleAreaCoverFile(file, areaId) {
+    if (!file || !areaId || !this.state.projectId) return;
+    if (!file.type?.startsWith('image/')) {
+      App.showToast('Envie uma imagem válida (jpg, png ou webp).');
+      return;
+    }
+    const { data: uploadData, error: uploadError } = await DB.uploadAreaCover(file, this.state.projectId, areaId);
+    if (uploadError || !uploadData) {
+      console.error(uploadError);
+      App.showToast('Não foi possível enviar a capa.');
+      return;
+    }
+
+    const { data: updated, error: updateError } = await DB.updateAreaCover(areaId, uploadData.cover_path, uploadData.cover_url);
+    if (updateError) {
+      console.error(updateError);
+      App.showToast('Não foi possível salvar a capa.');
+      return;
+    }
+
+    this.state.areas = this.state.areas.map((area) =>
+      String(area.id) === String(areaId)
+        ? { ...area, cover_path: uploadData.cover_path, cover_url: uploadData.cover_url, resolved_cover_url: uploadData.cover_url || area.resolved_cover_url }
+        : area
+    );
+    ProjectUI.renderAreas(this.state.areas);
+    App.showToast('Capa do cômodo atualizada.');
   },
 
   async handleCoverChange(file) {
@@ -682,7 +756,11 @@ const ProjectPage = {
       App.showToast('Não foi possível carregar cômodos.');
       return;
     }
-    this.state.areas = data || [];
+    const enriched = (data || []).map((area) => ({
+      ...area,
+      resolved_cover_url: area.cover_url || DB.getAreaCoverPublicUrl(area.cover_path) || null
+    }));
+    this.state.areas = enriched;
     ProjectUI.renderAreas(this.state.areas);
     ProjectUI.toggleKanbanBlock(this.state.project, this.state.areas);
   },
@@ -1466,6 +1544,12 @@ document.addEventListener('click', async (event) => {
   if (savePhotosBtn) {
     event.preventDefault();
     await ProjectPage.savePhotoFlags(savePhotosBtn);
+  }
+
+  const areaCover = event.target.closest('[data-action="area-cover"]');
+  if (areaCover) {
+    event.preventDefault();
+    await ProjectPage.handleAreaCoverClick(areaCover.dataset.areaId);
   }
 });
 
