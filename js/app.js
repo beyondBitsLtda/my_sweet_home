@@ -187,6 +187,46 @@ const App = {
     container.append(greeting, logoutButton);
   },
 
+  rememberProjectId(projectId) {
+    if (!projectId) return;
+    try {
+      localStorage.setItem('msh_last_project_id', projectId);
+    } catch (e) {
+      console.warn('Não foi possível salvar o último projeto', e);
+    }
+  },
+
+  readRememberedProjectId() {
+    try {
+      return localStorage.getItem('msh_last_project_id');
+    } catch (e) {
+      console.warn('Não foi possível ler o último projeto', e);
+      return null;
+    }
+  },
+
+  clearRememberedProjectId() {
+    try {
+      localStorage.removeItem('msh_last_project_id');
+    } catch (e) {
+      console.warn('Não foi possível limpar o último projeto', e);
+    }
+  },
+
+  /**
+   * syncNavLinksWithProject
+   * - Garante que os links Projeto/Planta preservem o parâmetro id do projeto atual.
+   */
+  syncNavLinksWithProject(projectId) {
+    if (!projectId) return;
+    document.querySelectorAll('.nav .nav-link').forEach((link) => {
+      const href = link.getAttribute('href') || '';
+      if (!href.includes('project.html') && !href.includes('planner.html')) return;
+      const [path] = href.split('?');
+      link.setAttribute('href', `${path}?id=${encodeURIComponent(projectId)}`);
+    });
+  },
+
   /**
    * focusLogin
    * - Faz scroll suave até o card de login para manter o fluxo convidativo.
@@ -228,6 +268,7 @@ const App = {
     App.state.user = null;
     App.updateHeader(null);
     App.renderAuthUI?.(null);
+    App.clearRememberedProjectId();
     App.showToast(message);
     if (redirect) App.navigate('index.html');
   },
@@ -661,6 +702,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const isAuthPage = location.pathname.endsWith('index.html') || location.pathname.endsWith('/');
   const isAppPage = location.pathname.endsWith('app.html');
+  const projectIdParam = new URLSearchParams(location.search).get('id');
+  if (projectIdParam) {
+    App.rememberProjectId(projectIdParam);
+    App.syncNavLinksWithProject(projectIdParam);
+  } else {
+    const lastProjectId = App.readRememberedProjectId();
+    App.syncNavLinksWithProject(lastProjectId);
+  }
 
   // Recupera sessão ativa e atualiza header e UI de auth.
   const { session } = await DB.getSession();
