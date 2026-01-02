@@ -807,18 +807,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Garante a criação/atualização do perfil ao receber uma nova sessão (ex.: magic link).
-  DB.onAuthStateChange(async (_event, newSession) => {
-    App.state.user = newSession?.user ?? null;
-    App.updateHeader(App.state.user);
-
+  DB.onAuthStateChange(async (event, newSession) => {
     const isAuthPage = location.pathname.endsWith('index.html') || location.pathname.endsWith('/');
-    App.renderAuthUI(newSession);
+    const nextUser = newSession?.user ?? null;
 
-    if (newSession?.user) {
-      await App.ensureProfile(newSession.user);
-      App.showToast('Login concluído com sucesso.');
-      // Em páginas protegidas, manter navegação; na página de auth mostramos card logado.
+    // Tratamos apenas eventos relevantes para evitar poluir a navegação com toasts constantes
+    // em refresh de token ou atualizações silenciosas.
+    if (event === 'SIGNED_OUT') {
+      App.state.user = null;
+      App.updateHeader(null);
+      if (isAuthPage) App.renderAuthUI(null);
+      return;
     }
+
+    if (event === 'SIGNED_IN') {
+      App.state.user = nextUser;
+      App.updateHeader(App.state.user);
+      if (isAuthPage) App.renderAuthUI(newSession);
+      if (nextUser) {
+        await App.ensureProfile(nextUser);
+        App.showToast('Login concluído com sucesso.');
+      }
+      return;
+    }
+
+    // Mantém o estado em sincronia sem mensagens extras em eventos como TOKEN_REFRESHED.
+    App.state.user = nextUser;
+    App.updateHeader(App.state.user);
+    if (isAuthPage) App.renderAuthUI(newSession);
   });
 
   // Delegação de eventos para logout: funciona mesmo se o header for re-renderizado.
