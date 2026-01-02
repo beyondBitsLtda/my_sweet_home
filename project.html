@@ -248,34 +248,39 @@
   <script src="js/db.js"></script>
   <script src="js/project.js"></script>
     <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-      const tryInit = async () => {
-        const initializer = window.ProjectPage?.init || window.initProjectPage;
-        if (typeof initializer === 'function') {
-          await initializer();
-          return true;
-        }
-        return false;
-      };
+  document.addEventListener('DOMContentLoaded', async () => {
+    const tryInit = async () => {
+      const page = window.ProjectPage;
+      const initializer = page?.init || window.initProjectPage;
 
-      if (await tryInit()) return;
+      if (typeof initializer === 'function') {
+        // ✅ garante que "this" seja ProjectPage
+        await initializer.call(page);
+        return true;
+      }
+      return false;
+    };
 
-      const onReady = async () => {
-        if (await tryInit()) {
-          window.removeEventListener('ProjectPageReady', onReady);
-        }
-      };
-      window.addEventListener('ProjectPageReady', onReady);
+    if (await tryInit()) return;
 
-      setTimeout(async () => {
-        const initialized = await tryInit();
-        if (initialized) {
-          window.removeEventListener('ProjectPageReady', onReady);
-          return;
-        }
-        console.error('Initializer não encontrado: defina ProjectPage.init ou initProjectPage.');
-      }, 50);
-    });
-  </script>
+    const onReady = async () => {
+      if (await tryInit()) {
+        window.removeEventListener('ProjectPageReady', onReady);
+      }
+    };
+
+    window.addEventListener('ProjectPageReady', onReady);
+
+    setTimeout(async () => {
+      const initialized = await tryInit();
+      if (initialized) {
+        window.removeEventListener('ProjectPageReady', onReady);
+        return;
+      }
+      console.error('Initializer não encontrado: defina ProjectPage.init ou initProjectPage.');
+    }, 50);
+  });
+</script>
+
 </body>
 </html>
