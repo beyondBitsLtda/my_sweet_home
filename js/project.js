@@ -303,6 +303,7 @@ const ProjectUI = {
         (area) => {
           const coverUrl = area.cover_url || area.resolved_cover_url || 'assets/img/add_room.jpg';
           const isPlaceholder = !area.cover_url && !area.resolved_cover_url && !area.cover_path;
+          const photoStatus = isPlaceholder ? '' : 'Foto adicionada';
           return `
       <article class="card area-card" data-area-id="${area.id}">
         <div class="cover-frame is-card area-cover ${isPlaceholder ? 'is-placeholder' : ''}" data-action="area-cover" data-area-id="${area.id}">
@@ -314,7 +315,7 @@ const ProjectUI = {
         <div class="card-top">
           <div>
             <p class="label">${area.name}</p>
-            <p class="muted">${area.photo_cover_url ? 'Foto adicionada' : 'Sem foto'}</p>
+            ${photoStatus ? `<p class="muted">${photoStatus}</p>` : ''}
           </div>
           <div class="pill-row slim">
             <span class="pill soft">${area.kind || 'Cômodo'}</span>
@@ -908,6 +909,26 @@ const ProjectPage = {
     const form = document.getElementById('areaForm');
     const formCard = document.getElementById('area-form-card');
     const cancelBtn = form?.querySelector('[data-action="cancel-area-form"]');
+    const kindInput = form?.querySelector('#areaKind');
+    const kindButtons = form?.querySelectorAll('[data-kind-option]');
+
+    const setKindSelection = (value) => {
+      if (kindInput) kindInput.value = value;
+      if (kindButtons) {
+        kindButtons.forEach((btn) => {
+          btn.classList.toggle('is-selected', btn.value === value);
+        });
+      }
+    };
+
+    if (kindButtons) {
+      kindButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          setKindSelection(btn.value);
+        });
+      });
+    }
+
     if (!form) return;
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -932,6 +953,7 @@ const ProjectPage = {
       }
       App.showToast('Cômodo criado.');
       form.reset();
+      setKindSelection('');
       this.state.areas.unshift(data);
       ProjectUI.renderAreas(this.state.areas);
       await this.hydrateSubAreasAndCorners();
@@ -1327,6 +1349,8 @@ const ProjectPage = {
     }
     if (form) {
       form.reset();
+      const kindButtons = form.querySelectorAll('[data-kind-option]');
+      kindButtons.forEach((btn) => btn.classList.remove('is-selected'));
     }
   },
 
