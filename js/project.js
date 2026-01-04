@@ -509,25 +509,35 @@ const ProjectUI = {
               }
               return ProjectDomain.findAreaName(lookups.areas, task.scope_id);
             })();
-            const metadata = `${scopeBadge} · peso ${task.weight || 'leve'} · custo ${task.cost_expected || 0}`;
-        const hasPhotos = task.has_photo_before || task.photo_before_url;
-        const hasAfter = task.has_photo_after || task.photo_after_url;
+            const metadata = {
+              weight: task.weight || 'leve',
+              cost: task.cost_expected || 0,
+              due: task.due_date || '—'
+            };
+            const hasPhotos = task.has_photo_before || task.photo_before_url;
+            const hasAfter = task.has_photo_after || task.photo_after_url;
             return `
               <article class="card kanban-card">
-                <div class="card-top">
+                <div class="kanban-card__header">
                   <p class="label">${task.title}</p>
                   <span class="badge outline">${task.task_type || 'tarefa'}</span>
                 </div>
-                <p class="muted">${metadata}</p>
-                <div class="pill-row">
-                  <span class="pill">Prazo ${task.due_date || '—'}</span>
-                  <span class="pill ${hasPhotos ? '' : 'outline'}">Antes ${hasPhotos ? '✓' : '✗'}</span>
-                  <span class="pill ${hasAfter ? '' : 'outline'}">Depois ${hasAfter ? '✓' : '✗'}</span>
+                <div class="kanban-tags">
+                  <span class="pill soft">${scopeBadge}</span>
+                  <span class="pill ghost">Peso ${metadata.weight}</span>
+                  <span class="pill ghost">Custo ${metadata.cost}</span>
                 </div>
-                <div class="card-actions">
+                <div class="kanban-badges">
+                  <span class="pill ${task.due_date ? 'soft' : 'outline'}">Prazo ${metadata.due}</span>
+                  <span class="pill ${hasPhotos ? 'soft' : 'outline'}">Antes ${hasPhotos ? '✓' : '✗'}</span>
+                  <span class="pill ${hasAfter ? 'soft' : 'outline'}">Depois ${hasAfter ? '✓' : '✗'}</span>
+                </div>
+                <div class="kanban-actions">
                   <button class="btn ghost tiny" type="button" data-action="open-photos" data-task-id="${task.id}">Fotos</button>
-                  <button class="btn move" type="button" data-action="move-task" data-direction="left" data-task-id="${task.id}">←</button>
-                  <button class="btn move" type="button" data-action="move-task" data-direction="right" data-task-id="${task.id}">→</button>
+                  <div class="kanban-move">
+                    <button class="btn move tiny" type="button" data-action="move-task" data-direction="left" data-task-id="${task.id}">←</button>
+                    <button class="btn move tiny" type="button" data-action="move-task" data-direction="right" data-task-id="${task.id}">→</button>
+                  </div>
                 </div>
               </article>
             `;
@@ -535,12 +545,17 @@ const ProjectUI = {
           .join('');
 
         return `
-          <div class="kanban-column">
+          <div class="kanban-column" data-status="${st.key}">
             <div class="kanban-header">
-              <span>${st.label}</span>
+              <div class="kanban-title">
+                <span class="kanban-dot"></span>
+                <span>${st.label}</span>
+              </div>
               <span class="kanban-counter">${items.length}</span>
             </div>
-            ${cards || '<div class="kanban-empty">Sem tarefas.</div>'}
+            <div class="kanban-list">
+              ${cards || '<div class="kanban-empty">Sem tarefas.</div>'}
+            </div>
           </div>
         `;
       })

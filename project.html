@@ -193,7 +193,9 @@
             <p class="empty-text">Nenhuma tarefa neste escopo ainda.</p>
             <button class="btn ghost" type="button" onclick="document.getElementById('taskForm')?.scrollIntoView({ behavior: 'smooth' })">Criar tarefa</button>
           </div>
-          <div class="kanban" id="kanban-board"></div>
+          <div class="kanban-shell">
+            <div class="kanban" id="kanban-board"></div>
+          </div>
         </div>
       </section>
 
