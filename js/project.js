@@ -909,6 +909,26 @@ const ProjectPage = {
     const form = document.getElementById('areaForm');
     const formCard = document.getElementById('area-form-card');
     const cancelBtn = form?.querySelector('[data-action="cancel-area-form"]');
+    const kindInput = form?.querySelector('#areaKind');
+    const kindButtons = form?.querySelectorAll('[data-kind-option]');
+
+    const setKindSelection = (value) => {
+      if (kindInput) kindInput.value = value;
+      if (kindButtons) {
+        kindButtons.forEach((btn) => {
+          btn.classList.toggle('is-selected', btn.value === value);
+        });
+      }
+    };
+
+    if (kindButtons) {
+      kindButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          setKindSelection(btn.value);
+        });
+      });
+    }
+
     if (!form) return;
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -933,6 +953,7 @@ const ProjectPage = {
       }
       App.showToast('Cômodo criado.');
       form.reset();
+      setKindSelection('');
       this.state.areas.unshift(data);
       ProjectUI.renderAreas(this.state.areas);
       await this.hydrateSubAreasAndCorners();
@@ -1328,6 +1349,8 @@ const ProjectPage = {
     }
     if (form) {
       form.reset();
+      const kindButtons = form.querySelectorAll('[data-kind-option]');
+      kindButtons.forEach((btn) => btn.classList.remove('is-selected'));
     }
   },
 

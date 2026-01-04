@@ -104,20 +104,20 @@
             <input class="input" id="areaName" name="name" placeholder="Sala de estar" required />
 
             <label class="muted" for="areaKind">Tipo</label>
-            <select class="input" id="areaKind" name="kind" required>
-              <option value="">Selecione</option>
-              <option>Sala</option>
-              <option>Cozinha</option>
-              <option>Quarto</option>
-              <option>Banheiro</option>
-              <option>Lavanderia</option>
-              <option>Varanda</option>
-              <option>Escritório</option>
-              <option>Hall</option>
-              <option>Closet</option>
-              <option>Área de Serviço</option>
-              <option>Outro</option>
-            </select>
+            <input type="hidden" id="areaKind" name="kind" />
+            <div class="kind-options" role="group" aria-label="Tipo de cômodo">
+              <button type="button" class="kind-option" data-kind-option value="Sala">Sala</button>
+              <button type="button" class="kind-option" data-kind-option value="Cozinha">Cozinha</button>
+              <button type="button" class="kind-option" data-kind-option value="Quarto">Quarto</button>
+              <button type="button" class="kind-option" data-kind-option value="Banheiro">Banheiro</button>
+              <button type="button" class="kind-option" data-kind-option value="Lavanderia">Lavanderia</button>
+              <button type="button" class="kind-option" data-kind-option value="Varanda">Varanda</button>
+              <button type="button" class="kind-option" data-kind-option value="Escritório">Escritório</button>
+              <button type="button" class="kind-option" data-kind-option value="Hall">Hall</button>
+              <button type="button" class="kind-option" data-kind-option value="Closet">Closet</button>
+              <button type="button" class="kind-option" data-kind-option value="Área de Serviço">Área de Serviço</button>
+              <button type="button" class="kind-option" data-kind-option value="Outro">Outro</button>
+            </div>
 
             <label class="muted" for="areaPhoto">Foto (opcional)</label>
             <input class="input" id="areaPhoto" name="photo_cover_url" placeholder="URL da foto (opcional)" />
