@@ -303,6 +303,7 @@ const ProjectUI = {
         (area) => {
           const coverUrl = area.cover_url || area.resolved_cover_url || 'assets/img/add_room.jpg';
           const isPlaceholder = !area.cover_url && !area.resolved_cover_url && !area.cover_path;
+          const photoStatus = isPlaceholder ? '' : 'Foto adicionada';
           return `
       <article class="card area-card" data-area-id="${area.id}">
         <div class="cover-frame is-card area-cover ${isPlaceholder ? 'is-placeholder' : ''}" data-action="area-cover" data-area-id="${area.id}">
@@ -314,7 +315,7 @@ const ProjectUI = {
         <div class="card-top">
           <div>
             <p class="label">${area.name}</p>
-            <p class="muted">${area.photo_cover_url ? 'Foto adicionada' : 'Sem foto'}</p>
+            ${photoStatus ? `<p class="muted">${photoStatus}</p>` : ''}
           </div>
           <div class="pill-row slim">
             <span class="pill soft">${area.kind || 'Cômodo'}</span>
@@ -508,25 +509,35 @@ const ProjectUI = {
               }
               return ProjectDomain.findAreaName(lookups.areas, task.scope_id);
             })();
-            const metadata = `${scopeBadge} · peso ${task.weight || 'leve'} · custo ${task.cost_expected || 0}`;
-        const hasPhotos = task.has_photo_before || task.photo_before_url;
-        const hasAfter = task.has_photo_after || task.photo_after_url;
+            const metadata = {
+              weight: task.weight || 'leve',
+              cost: task.cost_expected || 0,
+              due: task.due_date || '—'
+            };
+            const hasPhotos = task.has_photo_before || task.photo_before_url;
+            const hasAfter = task.has_photo_after || task.photo_after_url;
             return `
               <article class="card kanban-card">
-                <div class="card-top">
+                <div class="kanban-card__header">
                   <p class="label">${task.title}</p>
                   <span class="badge outline">${task.task_type || 'tarefa'}</span>
                 </div>
-                <p class="muted">${metadata}</p>
-                <div class="pill-row">
-                  <span class="pill">Prazo ${task.due_date || '—'}</span>
-                  <span class="pill ${hasPhotos ? '' : 'outline'}">Antes ${hasPhotos ? '✓' : '✗'}</span>
-                  <span class="pill ${hasAfter ? '' : 'outline'}">Depois ${hasAfter ? '✓' : '✗'}</span>
+                <div class="kanban-tags">
+                  <span class="pill soft">${scopeBadge}</span>
+                  <span class="pill ghost">Peso ${metadata.weight}</span>
+                  <span class="pill ghost">Custo ${metadata.cost}</span>
                 </div>
-                <div class="card-actions">
+                <div class="kanban-badges">
+                  <span class="pill ${task.due_date ? 'soft' : 'outline'}">Prazo ${metadata.due}</span>
+                  <span class="pill ${hasPhotos ? 'soft' : 'outline'}">Antes ${hasPhotos ? '✓' : '✗'}</span>
+                  <span class="pill ${hasAfter ? 'soft' : 'outline'}">Depois ${hasAfter ? '✓' : '✗'}</span>
+                </div>
+                <div class="kanban-actions">
                   <button class="btn ghost tiny" type="button" data-action="open-photos" data-task-id="${task.id}">Fotos</button>
-                  <button class="btn move" type="button" data-action="move-task" data-direction="left" data-task-id="${task.id}">←</button>
-                  <button class="btn move" type="button" data-action="move-task" data-direction="right" data-task-id="${task.id}">→</button>
+                  <div class="kanban-move">
+                    <button class="btn move tiny" type="button" data-action="move-task" data-direction="left" data-task-id="${task.id}">←</button>
+                    <button class="btn move tiny" type="button" data-action="move-task" data-direction="right" data-task-id="${task.id}">→</button>
+                  </div>
                 </div>
               </article>
             `;
@@ -534,12 +545,17 @@ const ProjectUI = {
           .join('');
 
         return `
-          <div class="kanban-column">
+          <div class="kanban-column" data-status="${st.key}">
             <div class="kanban-header">
-              <span>${st.label}</span>
+              <div class="kanban-title">
+                <span class="kanban-dot"></span>
+                <span>${st.label}</span>
+              </div>
               <span class="kanban-counter">${items.length}</span>
             </div>
-            ${cards || '<div class="kanban-empty">Sem tarefas.</div>'}
+            <div class="kanban-list">
+              ${cards || '<div class="kanban-empty">Sem tarefas.</div>'}
+            </div>
           </div>
         `;
       })
@@ -655,6 +671,7 @@ const ProjectPage = {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/jpeg,image/png,image/webp,image/jpg';
+    input.setAttribute('capture', 'environment');
     input.classList.add('hidden');
     input.id = 'area-cover-input';
     input.addEventListener('change', async (event) => {
@@ -908,6 +925,26 @@ const ProjectPage = {
     const form = document.getElementById('areaForm');
     const formCard = document.getElementById('area-form-card');
     const cancelBtn = form?.querySelector('[data-action="cancel-area-form"]');
+    const kindInput = form?.querySelector('#areaKind');
+    const kindButtons = form?.querySelectorAll('[data-kind-option]');
+
+    const setKindSelection = (value) => {
+      if (kindInput) kindInput.value = value;
+      if (kindButtons) {
+        kindButtons.forEach((btn) => {
+          btn.classList.toggle('is-selected', btn.value === value);
+        });
+      }
+    };
+
+    if (kindButtons) {
+      kindButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          setKindSelection(btn.value);
+        });
+      });
+    }
+
     if (!form) return;
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -932,6 +969,7 @@ const ProjectPage = {
       }
       App.showToast('Cômodo criado.');
       form.reset();
+      setKindSelection('');
       this.state.areas.unshift(data);
       ProjectUI.renderAreas(this.state.areas);
       await this.hydrateSubAreasAndCorners();
@@ -1327,6 +1365,8 @@ const ProjectPage = {
     }
     if (form) {
       form.reset();
+      const kindButtons = form.querySelectorAll('[data-kind-option]');
+      kindButtons.forEach((btn) => btn.classList.remove('is-selected'));
     }
   },
 
