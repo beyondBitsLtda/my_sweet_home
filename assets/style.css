@@ -1133,6 +1133,11 @@ textarea:focus {
   gap: var(--space-2);
 }
 
+.photo-picker-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 .photo-preview {
   max-width: 100%;
   border: 1px solid var(--color-border);

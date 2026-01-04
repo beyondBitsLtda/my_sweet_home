@@ -230,12 +230,20 @@
       <div id="photoForm" class="photo-form">
         <div class="photo-input">
           <label class="muted">Foto Antes</label>
-          <input type="file" accept="image/*" id="photoBefore" capture="environment" />
+          <input type="file" accept="image/*" id="photoBefore" class="hidden" />
+          <div class="photo-picker-actions">
+            <button class="btn ghost tiny" type="button" data-action="pick-photo" data-target="photoBefore" data-source="camera">Câmera</button>
+            <button class="btn ghost tiny" type="button" data-action="pick-photo" data-target="photoBefore" data-source="gallery">Galeria</button>
+          </div>
           <img id="photoBeforePreview" class="photo-preview hidden" alt="Preview antes" />
         </div>
         <div class="photo-input">
           <label class="muted">Foto Depois</label>
-          <input type="file" accept="image/*" id="photoAfter" capture="environment" />
+          <input type="file" accept="image/*" id="photoAfter" class="hidden" />
+          <div class="photo-picker-actions">
+            <button class="btn ghost tiny" type="button" data-action="pick-photo" data-target="photoAfter" data-source="camera">Câmera</button>
+            <button class="btn ghost tiny" type="button" data-action="pick-photo" data-target="photoAfter" data-source="gallery">Galeria</button>
+          </div>
           <img id="photoAfterPreview" class="photo-preview hidden" alt="Preview depois" />
         </div>
         <div class="modal-actions">

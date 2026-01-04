@@ -644,7 +644,15 @@ const ProjectPage = {
     const coverShell = document.getElementById('project-cover-shell');
     const coverUpload = document.getElementById('project-cover-upload');
     if (coverShell && coverUpload) {
-      coverShell.addEventListener('click', () => coverUpload.click());
+      coverShell.addEventListener('click', () => {
+        const source = this.chooseMediaSource();
+        if (source === 'camera') {
+          coverUpload.setAttribute('capture', 'environment');
+        } else {
+          coverUpload.removeAttribute('capture');
+        }
+        coverUpload.click();
+      });
       coverUpload.addEventListener('change', async (event) => {
         const file = event.target.files?.[0];
         if (file) {
@@ -685,6 +693,11 @@ const ProjectPage = {
     this.state.areaCoverUpload.input = input;
   },
 
+  chooseMediaSource() {
+    const useCamera = window.confirm('Usar câmera? OK para câmera, Cancelar para galeria.');
+    return useCamera ? 'camera' : 'gallery';
+  },
+
   async handleAreaCoverClick(areaId) {
     if (!areaId) return;
     if (!this.state.projectId) {
@@ -694,6 +707,12 @@ const ProjectPage = {
     const areaExists = this.state.areas.some((a) => String(a.id) === String(areaId));
     if (!areaExists) return;
     this.state.areaCoverUpload.areaId = areaId;
+    const source = this.chooseMediaSource();
+    if (source === 'camera') {
+      this.state.areaCoverUpload.input?.setAttribute('capture', 'environment');
+    } else {
+      this.state.areaCoverUpload.input?.removeAttribute('capture');
+    }
     this.state.areaCoverUpload.input?.click();
   },
 
@@ -1254,6 +1273,22 @@ const ProjectPage = {
     if (beforeImg) beforeImg.classList.add('hidden');
     if (afterImg) afterImg.classList.add('hidden');
     modal.classList.remove('hidden');
+
+    const pickerButtons = modal.querySelectorAll('[data-action="pick-photo"]');
+    pickerButtons.forEach((btn) => {
+      btn.onclick = () => {
+        const targetId = btn.dataset.target;
+        const source = btn.dataset.source;
+        const input = document.getElementById(targetId);
+        if (!input) return;
+        if (source === 'camera') {
+          input.setAttribute('capture', 'environment');
+        } else {
+          input.removeAttribute('capture');
+        }
+        input.click();
+      };
+    });
   },
 
   closePhotoModal() {
