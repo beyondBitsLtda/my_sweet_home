@@ -303,6 +303,7 @@ const ProjectUI = {
         (area) => {
           const coverUrl = area.cover_url || area.resolved_cover_url || 'assets/img/add_room.jpg';
           const isPlaceholder = !area.cover_url && !area.resolved_cover_url && !area.cover_path;
+          const photoStatus = isPlaceholder ? '' : 'Foto adicionada';
           return `
       <article class="card area-card" data-area-id="${area.id}">
         <div class="cover-frame is-card area-cover ${isPlaceholder ? 'is-placeholder' : ''}" data-action="area-cover" data-area-id="${area.id}">
@@ -314,7 +315,7 @@ const ProjectUI = {
         <div class="card-top">
           <div>
             <p class="label">${area.name}</p>
-            <p class="muted">${area.photo_cover_url ? 'Foto adicionada' : 'Sem foto'}</p>
+            ${photoStatus ? `<p class="muted">${photoStatus}</p>` : ''}
           </div>
           <div class="pill-row slim">
             <span class="pill soft">${area.kind || 'Cômodo'}</span>
