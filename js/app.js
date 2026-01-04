@@ -778,6 +778,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     if (coverInput) {
+      coverInput.addEventListener('click', () => {
+        const useCamera = window.confirm('Usar câmera? OK para câmera, Cancelar para galeria.');
+        if (useCamera) {
+          coverInput.setAttribute('capture', 'environment');
+        } else {
+          coverInput.removeAttribute('capture');
+        }
+      });
       coverInput.addEventListener('change', (ev) => {
         const file = ev.target.files?.[0];
         showCoverPreview(file);
