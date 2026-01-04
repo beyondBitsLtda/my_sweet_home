@@ -679,6 +679,7 @@ const ProjectPage = {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/jpeg,image/png,image/webp,image/jpg';
+    input.setAttribute('capture', 'environment');
     input.classList.add('hidden');
     input.id = 'area-cover-input';
     input.addEventListener('change', async (event) => {
