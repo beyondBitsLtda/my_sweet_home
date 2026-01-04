@@ -101,12 +101,15 @@ function computeProjectProgress(tasks) {
     weight: getWeightValue(t.weight)
   }));
   const W = normalized.reduce((sum, t) => sum + t.weight, 0);
-  if (!W) return { W: 0, progressPercent: 0 };
+  const totalCount = normalized.length;
+  const doneItems = normalized.filter((t) => t.status === 'done');
+  const doneCount = doneItems.length;
+  if (!W) return { W: 0, progressPercent: 0, doneCount, totalCount };
   const doneWeight = normalized
     .filter((t) => t.status === 'done')
     .reduce((sum, t) => sum + t.weight, 0);
   const progressPercent = Number(((doneWeight / W) * 100).toFixed(1));
-  return { W, progressPercent };
+  return { W, progressPercent, doneCount, totalCount };
 }
 
 function computeProjectPoints(tasks) {
@@ -891,33 +894,50 @@ const ProjectPage = {
     });
 
     const cards = [
-      { label: 'Progresso do projeto', value: `${progress.progressPercent}%`, caption: `Peso total ${progress.W}` },
-      { label: 'Pontos', value: points, caption: '80 × peso (tarefas concluídas com fotos)' },
-      { label: 'Tarefas atrasadas', value: deadlines.overdueCount, caption: 'Hoje > due_date e status != done' },
+      {
+        label: 'Progresso',
+        value: `${progress.progressPercent}%`,
+        caption: `Peso total ${progress.W} · ${progress.doneCount}/${progress.totalCount} tarefas`,
+        tone: 'progress',
+        icon: '⏱️'
+      },
+      { label: 'Pontos', value: points, caption: '80 × peso (tarefas concluídas com fotos)', tone: 'points', icon: '🏅' },
+      { label: 'Tarefas atrasadas', value: deadlines.overdueCount, caption: 'Hoje > due_date e status != done', tone: 'alert', icon: '⏳' },
       {
         label: 'Prazos após término',
         value: deadlines.beyondEndCount,
-        caption: this.state.project?.end_date ? `Due > ${this.state.project.end_date}` : 'Projeto sem data final'
+        caption: this.state.project?.end_date ? `Due > ${this.state.project.end_date}` : 'Projeto sem data final',
+        tone: 'warn',
+        icon: '🗓️'
       },
       {
         label: 'Orçado × Real',
         value: `R$ ${Number(budget.sumExpected || 0).toFixed(2)} / R$ ${Number(budget.sumReal || 0).toFixed(2)}`,
-        caption: 'Somatório em runtime (não persiste em projects)'
+        caption: 'Somatório em runtime (não persiste em projects)',
+        tone: 'budget',
+        icon: '💰'
       },
       {
         label: 'Orçamento estourado',
         value: budget.isOverBudget ? 'Sim' : 'Não',
-        caption: budget.isOverBudget ? 'Real > Orçado' : 'Dentro do orçado'
+        caption: budget.isOverBudget ? 'Real > Orçado' : 'Dentro do orçado',
+        tone: budget.isOverBudget ? 'alert' : 'ok',
+        icon: budget.isOverBudget ? '⚠️' : '✅'
       }
     ];
 
     grid.innerHTML = cards
       .map(
         (card) => `
-        <article class="card metric-card">
-          <p class="eyebrow">${card.label}</p>
+        <article class="card metric-card metric-card--${card.tone || 'neutral'}">
+          <div class="metric-top">
+            <span class="metric-icon">${card.icon || '•'}</span>
+            <div>
+              <p class="eyebrow">${card.label}</p>
+              <p class="muted small">${card.caption}</p>
+            </div>
+          </div>
           <h2>${card.value}</h2>
-          <p class="muted small">${card.caption}</p>
         </article>
       `
       )
