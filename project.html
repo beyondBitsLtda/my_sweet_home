@@ -55,7 +55,7 @@
             <span class="cover-overlay__text subtle">Clique para trocar a capa</span>
           </div>
         </div>
-        <input type="file" class="hidden" id="project-cover-upload" accept="image/*" />
+        <input type="file" class="hidden" id="project-cover-upload" accept="image/*" capture="environment" />
       </div>
 
       <div class="tabs" role="tablist">
@@ -230,12 +230,12 @@
       <div id="photoForm" class="photo-form">
         <div class="photo-input">
           <label class="muted">Foto Antes</label>
-          <input type="file" accept="image/*" id="photoBefore" />
+          <input type="file" accept="image/*" id="photoBefore" capture="environment" />
           <img id="photoBeforePreview" class="photo-preview hidden" alt="Preview antes" />
         </div>
         <div class="photo-input">
           <label class="muted">Foto Depois</label>
-          <input type="file" accept="image/*" id="photoAfter" />
+          <input type="file" accept="image/*" id="photoAfter" capture="environment" />
           <img id="photoAfterPreview" class="photo-preview hidden" alt="Preview depois" />
         </div>
         <div class="modal-actions">
